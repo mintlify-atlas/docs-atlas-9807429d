@@ -1,0 +1,252 @@
+---
+title: 'Certificate Configuration'
+description: 'Manage PKCS12 certificates for signing electronic documents'
+---
+
+JSIFEN requires a PKCS12 digital certificate to sign electronic documents before sending them to SIFEN. This guide covers certificate setup, security best practices, and troubleshooting.
+
+## Certificate Requirements
+
+Your digital certificate must meet these requirements:
+
+- **Format**: PKCS12 (.p12 or .pfx file)
+- **Issuer**: Authorized certification authority recognized by SET (Paraguay)
+- **Purpose**: Code signing or document signing
+- **Status**: Valid and not expired
+- **Private Key**: Must be included in the certificate file
+
+## Certificate Configuration
+
+Certificates are configured in `sifen.properties` using two parameters:
+
+<ParamField path="sifen.keystore.path" type="string" required>
+  Absolute path to the PKCS12 certificate file.
+  
+  ```properties
+  sifen.keystore.path=/path/to/certificado.p12
+  ```
+  
+  <Warning>
+    Always use absolute paths. Relative paths may cause issues in production environments.
+  </Warning>
+</ParamField>
+
+<ParamField path="sifen.keystore.password" type="string" required>
+  Password to unlock the certificate keystore.
+  
+  ```properties
+  sifen.keystore.password=ABCD12345
+  ```
+</ParamField>
+
+## Basic Setup
+
+<Steps>
+  <Step title="Obtain a valid certificate">
+    Get a PKCS12 certificate from an authorized certification authority in Paraguay.
+  </Step>
+  
+  <Step title="Store the certificate securely">
+    Place the certificate file in a secure location with restricted access:
+    
+    ```bash
+    sudo mkdir -p /etc/jsifen/certs
+    sudo cp certificado.p12 /etc/jsifen/certs/
+    sudo chmod 600 /etc/jsifen/certs/certificado.p12
+    sudo chown app-user:app-user /etc/jsifen/certs/certificado.p12
+    ```
+  </Step>
+  
+  <Step title="Configure the certificate path">
+    Update your `sifen.properties` file:
+    
+    ```properties
+    sifen.keystore.path=/etc/jsifen/certs/certificado.p12
+    sifen.keystore.password=YOUR_PASSWORD
+    ```
+  </Step>
+  
+  <Step title="Verify the configuration">
+    Test that JSIFEN can load and use the certificate by starting the application and checking for errors.
+  </Step>
+</Steps>
+
+## Security Best Practices
+
+### File System Security
+
+<Warning>
+  Digital certificates contain your private key. Protect them like passwords.
+</Warning>
+
+- **Restrict file permissions**: Only the application user should have read access
+  ```bash
+  chmod 600 certificado.p12
+  ```
+
+- **Store outside the application directory**: Don't package certificates with your application code
+
+- **Use secure directories**: Store certificates in `/etc/jsifen/certs` or a similar protected location
+
+### Password Management
+
+<Warning>
+  Never commit certificate passwords to version control.
+</Warning>
+
+Instead of hardcoding passwords in `sifen.properties`, use one of these approaches:
+
+#### Environment Variables
+
+Reference environment variables in your configuration:
+
+```properties
+sifen.keystore.password=${SIFEN_CERT_PASSWORD}
+```
+
+Set the environment variable when running:
+
+```bash
+export SIFEN_CERT_PASSWORD=ABCD12345
+java -jar quarkus-run.jar
+```
+
+#### External Configuration
+
+Store sensitive configuration outside your codebase:
+
+```bash
+# /etc/jsifen/sifen.properties (readable only by app user)
+sifen.keystore.password=ABCD12345
+```
+
+Load it using the system property:
+
+```bash
+java -Dsifen.config=/etc/jsifen/sifen.properties -jar quarkus-run.jar
+```
+
+#### Secrets Management
+
+In production, consider using:
+- Kubernetes Secrets
+- HashiCorp Vault
+- AWS Secrets Manager
+- Azure Key Vault
+
+### Certificate Rotation
+
+Digital certificates expire. Plan for certificate renewal:
+
+1. Monitor certificate expiration dates
+2. Obtain a new certificate before the current one expires
+3. Update the configuration with the new certificate path/password
+4. Restart the application
+5. Verify the new certificate is working
+6. Remove the old certificate
+
+## Verifying Your Certificate
+
+Before using a certificate with JSIFEN, verify it's valid:
+
+### Check Certificate Details
+
+Use OpenSSL to inspect the certificate:
+
+```bash
+openssl pkcs12 -info -in certificado.p12 -noout
+```
+
+This will prompt for the password and display certificate information.
+
+### Check Expiration Date
+
+```bash
+openssl pkcs12 -in certificado.p12 -nokeys -passin pass:PASSWORD | \
+  openssl x509 -noout -enddate
+```
+
+Replace `PASSWORD` with your certificate password.
+
+### Verify Certificate Chain
+
+```bash
+openssl pkcs12 -in certificado.p12 -nokeys -passin pass:PASSWORD | \
+  openssl x509 -noout -text
+```
+
+Ensure:
+- The certificate is not expired
+- The issuer is a recognized authority
+- The private key is present
+
+## Multi-Tenant Certificate Management
+
+When using [multi-tenant configuration](/configuration/multi-tenant), each client can have its own certificate:
+
+```properties
+# Default certificate
+sifen.keystore.path=/etc/jsifen/certs/default.p12
+sifen.keystore.password=DEFAULT_PASSWORD
+
+# San Antonio client certificate
+sifen.sanantonio.keystore.path=/etc/jsifen/certs/sanantonio.p12
+sifen.sanantonio.keystore.password=SANANTONIO_PASSWORD
+```
+
+Each certificate is loaded independently based on the `Emisor` header in API requests.
+
+## Troubleshooting
+
+### Certificate Not Found
+
+```
+Error: java.io.FileNotFoundException: /path/to/certificado.p12
+```
+
+**Solution**: Verify the path is correct and the file exists. Use absolute paths.
+
+### Invalid Password
+
+```
+Error: java.security.UnrecoverableKeyException: failed to decrypt safe contents entry
+```
+
+**Solution**: Check that `sifen.keystore.password` matches the certificate password.
+
+### Permission Denied
+
+```
+Error: java.io.FileNotFoundException: /etc/jsifen/certs/certificado.p12 (Permission denied)
+```
+
+**Solution**: Ensure the application user has read permissions:
+```bash
+sudo chown app-user:app-user certificado.p12
+sudo chmod 600 certificado.p12
+```
+
+### Expired Certificate
+
+```
+Error: Certificate expired
+```
+
+**Solution**: Obtain a new certificate from your certification authority and update the configuration.
+
+### Invalid Certificate Format
+
+```
+Error: java.security.KeyStoreException: invalid keystore format
+```
+
+**Solution**: Ensure the certificate is in PKCS12 format (.p12 or .pfx). Convert if necessary:
+```bash
+openssl pkcs12 -export -in certificate.crt -inkey private.key -out certificado.p12
+```
+
+## Next Steps
+
+- Configure [multi-tenant support](/configuration/multi-tenant) for multiple clients
+- Review [SIFEN setup](/configuration/sifen-setup) for complete configuration
+- Learn about [deployment best practices](/guides/deployment)

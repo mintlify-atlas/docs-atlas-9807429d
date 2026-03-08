@@ -1,0 +1,402 @@
+---
+title: Project Structure
+description: Detailed breakdown of JSIFEN's directory organization and key files
+---
+
+JSIFEN organizes its source code following Clean Architecture principles, with a clear directory structure that separates concerns across four main layers.
+
+## Directory Overview
+
+```
+src/main/java/com/jsifen/
+│
+├── application/          # Use cases and business workflows
+│   └── usecase/
+│       ├── de/           # Electronic document operations
+│       ├── evento/       # Event management
+│       ├── factura/      # Invoice operations
+│       ├── info/         # System information
+│       ├── lote/         # Batch operations
+│       └── ruc/          # RUC queries
+│
+├── domain/               # Core business logic
+│   ├── model/            # Domain entities
+│   │   └── factura/
+│   ├── repository/       # Repository contracts
+│   └── service/          # Domain services
+│
+├── infrastructure/       # Technical implementations
+│   ├── adapter/          # Repository implementations
+│   ├── config/           # Configuration
+│   │   ├── context/
+│   │   ├── rest/
+│   │   ├── security/
+│   │   └── sifen/
+│   ├── sifen/            # SIFEN-specific implementations
+│   │   └── xml/
+│   │       ├── buiilder/
+│   │       ├── gen/
+│   │       ├── mapping/
+│   │       └── structure/
+│   ├── soap/             # SOAP client implementations
+│   │   ├── builder/
+│   │   ├── client/
+│   │   │   ├── de/
+│   │   │   ├── evento/
+│   │   │   ├── info/
+│   │   │   ├── lote/
+│   │   │   └── ruc/
+│   │   ├── message/
+│   │   ├── parser/
+│   │   ├── processor/
+│   │   ├── request/
+│   │   └── signer/
+│   └── util/             # Utilities
+│       ├── time/
+│       └── xml/
+│           ├── parser/
+│           └── signer/
+│
+└── presentation/         # REST API layer
+    └── rest/
+        ├── consulta/     # Query endpoints
+        │   ├── de/
+        │   ├── lote/
+        │   │   └── dto/
+        │   └── ruc/
+        │       └── dto/
+        ├── evento/       # Event endpoints
+        │   └── cancelar/
+        │       └── dto/
+        ├── factura/      # Invoice endpoints
+        │   └── dto/
+        └── info/         # Info endpoints
+            └── dto/
+```
+
+## Layer-by-Layer Breakdown
+
+### Presentation Layer
+
+**Location:** `src/main/java/com/jsifen/presentation/rest/`
+
+The presentation layer exposes REST endpoints for external clients. Each resource delegates to application layer use cases.
+
+#### REST Resources (Controllers)
+
+<AccordionGroup>
+  <Accordion title="Invoice Endpoints">
+    **Package:** `presentation/rest/factura/`
+
+    - `AsyncRecibeResource.java`
+      - **Endpoint:** `POST /factura/async/recibe`
+      - **Purpose:** Receives invoice JSON, processes asynchronously
+      - **Use Case:** `RecibirFacturaUseCase`
+
+    - `FacturaXmlGenerarResource.java`
+      - **Purpose:** Generates XML from invoice data
+      - **Use Case:** `GenerarXmlFacturaUseCase`
+
+    **DTOs:**
+    - `dto/FacturaFirmadaResponse.java` - Signed invoice response
+  </Accordion>
+
+  <Accordion title="Query Endpoints">
+    **Package:** `presentation/rest/consulta/`
+
+    **Electronic Document Queries** (`consulta/de/`)
+    - `ConsultaDEResource.java`
+      - **Purpose:** Query electronic document status
+      - **Use Case:** `ConsultarDEUseCase`
+
+    **RUC Queries** (`consulta/ruc/`)
+    - `ConsultaRucResource.java`
+      - **Purpose:** Query taxpayer information by RUC
+      - **Use Case:** `ConsultarRucUseCase`
+    - DTOs:
+      - `dto/request/ConsultaRucRequest.java`
+      - `dto/response/ConsultarRucResponse.java`
+      - `dto/response/DatosRuc.java`
+
+    **Batch Queries** (`consulta/lote/`)
+    - `ConsultaLoteResource.java`
+      - **Purpose:** Query batch processing status
+      - **Use Case:** `ConsultaLoteUseCase`
+    - DTOs:
+      - `dto/request/ConsultarLoteRequest.java`
+      - `dto/response/ConsultaLoteResponse.java`
+  </Accordion>
+
+  <Accordion title="Event Endpoints">
+    **Package:** `presentation/rest/evento/cancelar/`
+
+    - `EventoCancelarResource.java`
+      - **Purpose:** Cancel electronic document events
+      - **Use Case:** `CancelarEventoUseCase`
+
+    **DTOs:**
+    - `dto/CancelarRequest.java`
+    - `dto/CancelarResponse.java`
+  </Accordion>
+
+  <Accordion title="Info Endpoints">
+    **Package:** `presentation/rest/info/`
+
+    - `SifenHealthResource.java`
+      - **Purpose:** Check SIFEN service availability
+      - **Use Case:** `SifenHealthUseCase`
+
+    **DTOs:**
+    - `dto/HealthStatus.java`
+  </Accordion>
+</AccordionGroup>
+
+### Application Layer
+
+**Location:** `src/main/java/com/jsifen/application/usecase/`
+
+Contains use cases that orchestrate business workflows. Each use case represents a single business operation.
+
+#### Use Cases by Domain
+
+| Package | Use Case | Purpose |
+|---------|----------|----------|
+| `factura/` | `RecibirFacturaUseCase.java` | Process invoice submission (generate XML, sign, send) |
+| `factura/` | `GenerarXmlFacturaUseCase.java` | Generate SIFEN-compliant XML from invoice data |
+| `de/` | `ConsultarDEUseCase.java` | Query electronic document by CDC |
+| `ruc/` | `ConsultarRucUseCase.java` | Query taxpayer data by RUC number |
+| `lote/` | `ConsultaLoteUseCase.java` | Check batch processing status |
+| `evento/` | `CancelarEventoUseCase.java` | Cancel electronic document events |
+| `info/` | `SifenHealthUseCase.java` | Verify SIFEN service health |
+
+**Example:** `application/usecase/factura/RecibirFacturaUseCase.java`
+
+This use case coordinates:
+1. XML generation from JSON input
+2. Digital signature application
+3. QR code addition
+4. Submission via repository
+
+### Domain Layer
+
+**Location:** `src/main/java/com/jsifen/domain/`
+
+The domain layer contains pure business logic with no external dependencies.
+
+#### Domain Models
+
+**Package:** `domain/model/factura/`
+
+- `FacturaElectronica.java`
+  - Core invoice entity
+  - Properties: `cdc` (control code), `linkQR`, `json`
+
+#### Repository Interfaces
+
+**Package:** `domain/repository/`
+
+Defines contracts for data operations (implemented by infrastructure layer):
+
+- `FacturaRepository.java` - Invoice operations
+  - `enviarFactura(String xml)` - Submit invoice to SIFEN
+
+- `DERepository.java` - Electronic document operations
+  - Query and manage electronic documents
+
+- `RucRepository.java` - RUC queries
+  - Retrieve taxpayer information
+
+- `LoteRepository.java` - Batch operations
+  - Submit and query batches
+
+- `EventoCancelarRepository.java` - Event cancellation
+  - Cancel document events
+
+#### Domain Services
+
+**Package:** `domain/service/`
+
+- `SifenDvCalculator.java`
+  - Calculates verification digits for SIFEN identifiers
+  - Pure business logic, no dependencies
+
+### Infrastructure Layer
+
+**Location:** `src/main/java/com/jsifen/infrastructure/`
+
+Provides concrete implementations and handles all technical concerns.
+
+#### Adapters (Repository Implementations)
+
+**Package:** `infrastructure/adapter/`
+
+Implements domain repository interfaces:
+
+- `FacturaRepositoryImpl.java` - Implements `FacturaRepository`
+  - Uses `LoteClient` to send invoices via SOAP
+
+- `DERepositoryImpl.java` - Implements `DERepository`
+  - Handles electronic document queries
+
+- `RucRepositoryImpl.java` - Implements `RucRepository`
+  - Queries taxpayer data from SIFEN
+
+- `LoteRepositoryImpl.java` - Implements `LoteRepository`
+  - Manages batch submissions and queries
+
+- `EventoCancelarRepositoryImpl.java` - Implements `EventoCancelarRepository`
+  - Handles event cancellations
+
+#### SOAP Integration
+
+**Package:** `infrastructure/soap/`
+
+<AccordionGroup>
+  <Accordion title="SOAP Clients (soap/client/)">
+    Communicate with SIFEN web services:
+
+    - `de/DEClient.java` - Electronic document queries
+    - `lote/LoteClient.java` - Batch submissions
+    - `ruc/RucClient.java` - RUC queries
+    - `evento/CancelarClient.java` - Event cancellations
+    - `info/SifenHealthClient.java` - Service health checks
+  </Accordion>
+
+  <Accordion title="SOAP Requests (soap/request/)">
+    Build SOAP request messages:
+
+    - `DERequest.java`
+    - `LoteRecibeRequest.java`
+    - `LoteConsultaRequest.java`
+    - `RucRequest.java`
+    - `EventoCancelarSoapRequest.java`
+  </Accordion>
+
+  <Accordion title="SOAP Utilities">
+    - `soap/signer/SifenXmlSigner.java` - XML digital signatures
+    - `soap/signer/EventoXmlSigner.java` - Event XML signing
+    - `soap/processor/SifenResponseProcessor.java` - Response processing
+    - `soap/parser/EventoCancelarSoapParser.java` - Parse cancellation responses
+    - `soap/message/SoapBodyExtractor.java` - Extract SOAP body
+    - `soap/message/SoapIdGenerator.java` - Generate message IDs
+    - `soap/builder/EventoSoapBuilder.java` - Build event SOAP messages
+  </Accordion>
+</AccordionGroup>
+
+#### SIFEN XML Generation
+
+**Package:** `infrastructure/sifen/xml/`
+
+<AccordionGroup>
+  <Accordion title="XML Builders (xml/buiilder/)">
+    - `SifenFacturaXmlGenerator.java` - Generate invoice XML
+    - `DeXmlBuilder.java` - Build electronic document XML
+    - `QrNodeBuilder.java` - Add QR code nodes to XML
+  </Accordion>
+
+  <Accordion title="XML Generators (xml/gen/)">
+    - `CdcGenerator.java` - Generate CDC (Control de Comprobante)
+    - `DeComplemento.java` - Generate document complements
+  </Accordion>
+
+  <Accordion title="XML Structure (xml/structure/)">
+    - `DeXmlStructure.java` - Define DE XML structure
+    - `DeXmlElement.java` - XML element definitions
+    - `XmlAttribute.java` - XML attribute handling
+  </Accordion>
+
+  <Accordion title="XML Mapping (xml/mapping/)">
+    - `Serializacion.java` - Serialize domain objects to XML
+    - `FieldMapping.java` - Map fields to XML nodes
+  </Accordion>
+</AccordionGroup>
+
+#### Configuration
+
+**Package:** `infrastructure/config/`
+
+<AccordionGroup>
+  <Accordion title="SIFEN Configuration (config/sifen/)">
+    - `SifenProperties.java` - SIFEN credentials and environment settings
+    - `SifenCertificateFile.java` - Certificate file handling
+    - `ServerSifen.java` - SIFEN server endpoints
+  </Accordion>
+
+  <Accordion title="Security Configuration (config/security/)">
+    - `SSLConfig.java` - SSL/TLS configuration for SOAP clients
+  </Accordion>
+
+  <Accordion title="Other Configuration">
+    - `config/context/EmisorContext.java` - Issuer context management
+    - `config/rest/RestApplication.java` - REST application configuration
+  </Accordion>
+</AccordionGroup>
+
+#### Utilities
+
+**Package:** `infrastructure/util/`
+
+<AccordionGroup>
+  <Accordion title="XML Utilities (util/xml/)">
+    - `XmlUtils.java` - XML manipulation helpers
+    - `HashUtils.java` - Hash generation for XML signing
+    - `parser/FileXML.java` - XML file parsing
+    - `parser/XmlJsonConverter.java` - Convert between XML and JSON
+    - `signer/XmlSigner.java` - Generic XML signing
+  </Accordion>
+
+  <Accordion title="Other Utilities">
+    - `util/time/ClienteNTP.java` - NTP time synchronization
+    - `util/xml/IOUtils.java` - I/O operations
+    - `util/xml/StringUtils.java` - String manipulation
+  </Accordion>
+</AccordionGroup>
+
+## Configuration Files
+
+### Application Configuration
+
+**Location:** `src/main/resources/`
+
+- `application.properties`
+  - Quarkus application settings
+  - HTTP port configuration (default: 8000)
+  - Logging settings
+
+- `sifen.properties`
+  - SIFEN credentials (`sifen.id-csc`, `sifen.csc`)
+  - Environment (`sifen.ambiente`: `prod` or `test`)
+  - Certificate path and password
+  - Example:
+    ```properties
+    sifen.id-csc=123
+    sifen.csc=ABCD
+    sifen.ambiente=prod
+    sifen.keystore.path=/path/to/certificate.p12
+    sifen.keystore.password=ABCD12345
+    ```
+
+## Build Output
+
+**Location:** `build/quarkus-app/`
+
+```
+quarkus-app/
+├── quarkus-run.jar          # Main application JAR
+└── config/
+    ├── application.properties
+    └── sifen.properties
+```
+
+To run in production:
+```bash
+java -Dquarkus.config.locations=./config -jar quarkus-run.jar
+```
+
+## Key Takeaways
+
+1. **Clear Layer Separation:** Each layer has a distinct directory and purpose
+2. **Package by Feature:** Within layers, code is organized by business domain (factura, ruc, lote)
+3. **Dependency Direction:** Outer layers depend on inner layers, never the reverse
+4. **Infrastructure Isolation:** All external integrations (SOAP, XML, config) are in infrastructure
+5. **Domain Purity:** Domain layer is completely framework-agnostic

@@ -1,0 +1,167 @@
+---
+title: 'SIFEN Configuration'
+description: 'Configure JSIFEN to connect with the SIFEN API'
+---
+
+JSIFEN uses a properties file to configure the connection to SIFEN's electronic invoicing system. This guide explains all available configuration options and how to set them up.
+
+## Configuration File Location
+
+JSIFEN looks for configuration in the following order:
+
+1. **External configuration** (production): Specify the path using the `sifen.config` system property
+2. **Local development**: Uses `src/main/resources/sifen.properties`
+
+<Steps>
+  <Step title="Create the configuration file">
+    Create a file named `sifen.properties` with your SIFEN credentials and settings.
+  </Step>
+  
+  <Step title="Configure basic settings">
+    Add the required properties for connecting to SIFEN:
+    
+    ```properties
+    sifen.ambiente=prod
+    sifen.id-csc=0001
+    sifen.csc=e5E5BE0B3DA91A5713C0E09f4b2f2208
+    sifen.keystore.path=/path/to/certificado.p12
+    sifen.keystore.password=ABCD12345
+    ```
+  </Step>
+  
+  <Step title="Use external configuration in production">
+    Run your application with the external configuration file:
+    
+    ```bash
+    java -Dsifen.config=/etc/jsifen/sifen.properties -jar quarkus-run.jar
+    ```
+  </Step>
+</Steps>
+
+## Configuration Parameters
+
+### Environment Settings
+
+<ParamField path="sifen.ambiente" type="string" required>
+  The SIFEN environment to connect to.
+  
+  - `prod`: Production environment (https://ekuatia.set.gov.py)
+  - `test`: Testing environment (https://ekuatia.set.gov.py/consultas-test)
+  
+  ```properties
+  sifen.ambiente=prod
+  ```
+</ParamField>
+
+### CSC Credentials
+
+<ParamField path="sifen.id-csc" type="string" required>
+  The CSC identifier provided by SIFEN. This is a unique identifier for your CSC credentials.
+  
+  ```properties
+  sifen.id-csc=0001
+  ```
+</ParamField>
+
+<ParamField path="sifen.csc" type="string" required>
+  The CSC (Código de Seguridad del Contribuyente) code provided by SIFEN.
+  
+  <Warning>
+    In test environment, this value is automatically replaced with `ABCD0000000000000000000000000000` regardless of what you configure.
+  </Warning>
+  
+  ```properties
+  sifen.csc=e5E5BE0B3DA91A5713C0E09f4b2f2208
+  ```
+</ParamField>
+
+### Certificate Settings
+
+<ParamField path="sifen.keystore.path" type="string" required>
+  Absolute path to your PKCS12 certificate file (.p12). This certificate is required for signing electronic documents.
+  
+  ```properties
+  sifen.keystore.path=/home/user/certificates/certificado.p12
+  ```
+  
+  See [Certificate Configuration](/configuration/certificates) for more details.
+</ParamField>
+
+<ParamField path="sifen.keystore.password" type="string" required>
+  Password to unlock the PKCS12 certificate keystore.
+  
+  <Warning>
+    Never commit this password to version control. Use environment variables or secure configuration management in production.
+  </Warning>
+  
+  ```properties
+  sifen.keystore.password=ABCD12345
+  ```
+</ParamField>
+
+## Obtaining SIFEN Credentials
+
+To use JSIFEN, you need to obtain credentials from the SET (Subsecretaría de Estado de Tributación) in Paraguay:
+
+<Steps>
+  <Step title="Register with SET">
+    Visit the SET website and register your company for electronic invoicing.
+  </Step>
+  
+  <Step title="Request CSC credentials">
+    Request your CSC identifier (`id-csc`) and CSC code from SET. These are unique to your taxpayer account.
+  </Step>
+  
+  <Step title="Obtain digital certificate">
+    Get a PKCS12 digital certificate from an authorized certification authority. This certificate will be used to digitally sign your electronic documents.
+  </Step>
+  
+  <Step title="Start with test environment">
+    Configure JSIFEN with `ambiente=test` to test your integration before going to production.
+  </Step>
+</Steps>
+
+## Complete Configuration Example
+
+```properties
+# SIFEN Environment Configuration
+sifen.ambiente=prod
+sifen.id-csc=0001
+sifen.csc=e5E5BE0B3DA91A5713C0E09f4b2f2208
+sifen.keystore.path=/home/hugo/dev/certificado.p12
+sifen.keystore.password=ABCD12345
+```
+
+## Automatic URL Resolution
+
+Based on the `ambiente` setting, JSIFEN automatically determines the correct SIFEN endpoints:
+
+- **Production**: `https://ekuatia.set.gov.py/consultas/qr`
+- **Test**: `https://ekuatia.set.gov.py/consultas-test/qr`
+
+You don't need to configure URLs manually.
+
+## Testing Your Configuration
+
+After configuring, verify your setup:
+
+1. Start the application in development mode:
+   ```bash
+   ./gradlew quarkusDev
+   ```
+
+2. Check the console output for configuration loading messages:
+   ```
+   📄 Cargando configuración DEV: src/main/resources/sifen.properties
+   ```
+
+3. Test the connection using the health check endpoint:
+   ```bash
+   curl http://localhost:8000/health
+   ```
+
+## Next Steps
+
+- Learn about [certificate management](/configuration/certificates)
+- Set up [multi-tenant configuration](/configuration/multi-tenant) for multiple clients
+- Explore the [API Reference](/api/invoices/generate-xml)

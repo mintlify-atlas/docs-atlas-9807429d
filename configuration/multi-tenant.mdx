@@ -1,0 +1,354 @@
+---
+title: 'Multi-Tenant Configuration'
+description: 'Configure JSIFEN to support multiple clients with different credentials'
+---
+
+JSIFEN supports multi-tenant configurations, allowing a single instance to handle electronic invoicing for multiple clients, each with their own SIFEN credentials and certificates.
+
+## How Multi-Tenancy Works
+
+JSIFEN uses a request-scoped context to identify which client's configuration to use:
+
+1. **Emisor Header**: API requests include an `Emisor` header with the client identifier
+2. **EmisorContext**: A request-scoped bean stores the current client identifier
+3. **Configuration Resolution**: Configuration is loaded based on the client identifier
+
+The `EmisorContext` class (`EmisorContext.java:6`) is a request-scoped CDI bean that maintains the current client context throughout the request lifecycle.
+
+## Configuration Pattern
+
+Multi-tenant configuration follows a naming pattern in `sifen.properties`:
+
+```properties
+# Default configuration (used when no Emisor header is provided)
+sifen.ambiente=prod
+sifen.id-csc=0001
+sifen.csc=default-csc-code
+sifen.keystore.path=/certs/default.p12
+sifen.keystore.password=DEFAULT_PASSWORD
+
+# Client-specific configuration
+sifen.{CLIENT_ID}.ambiente=prod
+sifen.{CLIENT_ID}.id-csc=0002
+sifen.{CLIENT_ID}.csc=client-specific-csc
+sifen.{CLIENT_ID}.keystore.path=/certs/{CLIENT_ID}.p12
+sifen.{CLIENT_ID}.keystore.password=CLIENT_PASSWORD
+```
+
+Replace `{CLIENT_ID}` with your client identifier (e.g., `sanantonio`, `cliente1`, `empresa-abc`).
+
+## Setting Up Multiple Clients
+
+<Steps>
+  <Step title="Configure the default client">
+    Set up the default configuration that will be used when no `Emisor` header is provided:
+    
+    ```properties
+    sifen.ambiente=prod
+    sifen.id-csc=0001
+    sifen.csc=e5E5BE0B3DA91A5713C0E09f4b2f2208
+    sifen.keystore.path=/etc/jsifen/certs/default.p12
+    sifen.keystore.password=DEFAULT_PASSWORD
+    ```
+  </Step>
+  
+  <Step title="Add client-specific configurations">
+    For each additional client, add a prefixed configuration block:
+    
+    ```properties
+    # San Antonio client
+    sifen.sanantonio.ambiente=prod
+    sifen.sanantonio.id-csc=0002
+    sifen.sanantonio.csc=different-csc-code
+    sifen.sanantonio.keystore.path=/etc/jsifen/certs/sanantonio.p12
+    sifen.sanantonio.keystore.password=SANANTONIO_PASSWORD
+    
+    # Another client
+    sifen.cliente2.ambiente=test
+    sifen.cliente2.id-csc=0003
+    sifen.cliente2.csc=cliente2-csc
+    sifen.cliente2.keystore.path=/etc/jsifen/certs/cliente2.p12
+    sifen.cliente2.keystore.password=CLIENTE2_PASSWORD
+    ```
+  </Step>
+  
+  <Step title="Organize certificates">
+    Store each client's certificate in a separate file:
+    
+    ```bash
+    /etc/jsifen/certs/
+    ├── default.p12
+    ├── sanantonio.p12
+    └── cliente2.p12
+    ```
+  </Step>
+  
+  <Step title="Test with the Emisor header">
+    Make API requests with the `Emisor` header to use client-specific configuration:
+    
+    ```bash
+    curl -X POST http://localhost:8000/consulta/ruc \
+      -H "Content-Type: application/json" \
+      -H "Emisor: sanantonio" \
+      -d '{"ruc": "80012345-6"}'
+    ```
+  </Step>
+</Steps>
+
+## Complete Multi-Tenant Example
+
+```properties sifen.properties
+# ===== Default Configuration =====
+sifen.ambiente=prod
+sifen.id-csc=0001
+sifen.csc=e5E5BE0B3DA91A5713C0E09f4b2f2208
+sifen.keystore.path=/home/hugo/dev/certificado.p12
+sifen.keystore.password=ABCD12345
+
+# ===== Cliente San Antonio =====
+sifen.sanantonio.ambiente=prod
+sifen.sanantonio.id-csc=0001
+sifen.sanantonio.csc=e5E5BE0B3DA91A5713C0E09f4b2f2208
+sifen.sanantonio.keystore.path=/home/hugo/dev/certificado.p12
+sifen.sanantonio.keystore.password=ABCD12345
+```
+
+## Using the Emisor Header
+
+All JSIFEN API endpoints support the optional `Emisor` header for multi-tenant requests.
+
+### Header Specification
+
+<ParamField header="Emisor" type="string">
+  The client identifier matching the configuration prefix in `sifen.properties`.
+  
+  - **Optional**: If not provided, the default configuration is used
+  - **Case-sensitive**: Must match the prefix exactly (e.g., `sanantonio` not `SanAntonio`)
+  - **No special characters**: Use simple identifiers (letters, numbers, hyphens, underscores)
+</ParamField>
+
+### API Request Examples
+
+#### Using Default Configuration
+
+When no `Emisor` header is provided, the default configuration (`sifen.*`) is used:
+
+```bash
+curl -X POST http://localhost:8000/consulta/ruc \
+  -H "Content-Type: application/json" \
+  -d '{"ruc": "80012345-6"}'
+```
+
+#### Using Client-Specific Configuration
+
+Provide the `Emisor` header to use a specific client's configuration:
+
+```bash
+curl -X POST http://localhost:8000/consulta/ruc \
+  -H "Content-Type: application/json" \
+  -H "Emisor: sanantonio" \
+  -d '{"ruc": "80098765-4"}'
+```
+
+#### JavaScript/Fetch Example
+
+```javascript
+const response = await fetch('http://localhost:8000/consulta/ruc', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Emisor': 'sanantonio'
+  },
+  body: JSON.stringify({ ruc: '80098765-4' })
+});
+```
+
+#### Java Example
+
+```java
+HttpClient client = HttpClient.newHttpClient();
+
+HttpRequest request = HttpRequest.newBuilder()
+    .uri(URI.create("http://localhost:8000/consulta/ruc"))
+    .header("Content-Type", "application/json")
+    .header("Emisor", "sanantonio")
+    .POST(HttpRequest.BodyPublishers.ofString(
+        "{\"ruc\": \"80098765-4\"}"
+    ))
+    .build();
+
+HttpResponse<String> response = client.send(request, 
+    HttpResponse.BodyHandlers.ofString());
+```
+
+## How Configuration Resolution Works
+
+The `SifenProperties` class (`SifenProperties.java:50-55`) implements the configuration resolution logic:
+
+```java
+private String get(String cliente, String key) {
+    if (cliente == null || cliente.isBlank()) {
+        return properties.getProperty("sifen." + key);
+    }
+    return properties.getProperty("sifen." + cliente + "." + key);
+}
+```
+
+**Resolution flow:**
+
+1. Request arrives with `Emisor: sanantonio` header
+2. `EmisorContext.setEmisor("sanantonio")` is called (`ConsultaRucResource.java:39`)
+3. When configuration is needed, `SifenProperties` looks for `sifen.sanantonio.ambiente`
+4. If found, uses client-specific value; otherwise falls back to default
+5. Certificate and credentials are loaded for that specific client
+
+## EmisorContext Usage in Code
+
+The `EmisorContext` is injected into resources and used throughout the request:
+
+```java ConsultaRucResource.java
+@Inject
+EmisorContext emisorContext;
+
+@POST
+public Response consultarRuc(
+        @HeaderParam("Emisor") String emisor,
+        ConsultaRucRequest request) {
+    
+    // Set the emisor context for this request
+    if (emisor == null || emisor.isBlank()) {
+        emisor = null;  // Use default
+    }
+    emisorContext.setEmisor(emisor);
+    
+    // All subsequent operations use this context
+    ConsultarRucResponse response = consultarRucUseCase.execute(request.getRuc());
+    // ...
+}
+```
+
+The context is request-scoped (`EmisorContext.java:5`), so it's automatically cleaned up after the request completes.
+
+## Configuration Best Practices
+
+### Naming Conventions
+
+- Use lowercase client identifiers: `sanantonio`, not `SanAntonio`
+- Use hyphens or underscores for multi-word names: `empresa-abc` or `empresa_abc`
+- Keep identifiers short and descriptive
+- Avoid special characters that might cause issues in headers
+
+### Security Considerations
+
+<Warning>
+  Each client's credentials and certificates should be kept separate and secure.
+</Warning>
+
+- Store each client's certificate in a separate file
+- Use different passwords for each client's certificate
+- Apply appropriate file permissions to each certificate
+- Consider using environment variables for sensitive values:
+
+```properties
+sifen.sanantonio.keystore.password=${SANANTONIO_CERT_PASSWORD}
+sifen.cliente2.keystore.password=${CLIENTE2_CERT_PASSWORD}
+```
+
+### Environment Separation
+
+You can mix production and test environments for different clients:
+
+```properties
+# Client 1 in production
+sifen.cliente1.ambiente=prod
+sifen.cliente1.id-csc=0001
+# ...
+
+# Client 2 still testing
+sifen.cliente2.ambiente=test
+sifen.cliente2.id-csc=0002
+# ...
+```
+
+## Testing Multi-Tenant Setup
+
+### Verify Configuration Loading
+
+Use the `printConfig` method to debug configuration (`SifenProperties.java:111-120`):
+
+```java
+sifenProperties.printConfig(null);           // Default
+sifenProperties.printConfig("sanantonio");   // San Antonio client
+```
+
+Output:
+```
+===== SIFEN CONFIG =====
+Cliente          : sanantonio
+Ambiente         : prod
+ID CSC           : 0001
+CSC efectivo     : e5E5BE0B3DA91A5713C0E09f4b2f2208
+Keystore Path    : /home/hugo/dev/certificado.p12
+URL QR           : https://ekuatia.set.gov.py/consultas/qr?
+========================
+```
+
+### Test API Endpoints
+
+Test each client configuration:
+
+```bash
+# Test default configuration
+curl -X POST http://localhost:8000/consulta/ruc \
+  -H "Content-Type: application/json" \
+  -d '{"ruc": "80012345-6"}'
+
+# Test sanantonio configuration
+curl -X POST http://localhost:8000/consulta/ruc \
+  -H "Content-Type: application/json" \
+  -H "Emisor: sanantonio" \
+  -d '{"ruc": "80012345-6"}'
+```
+
+## Supported Endpoints
+
+All JSIFEN endpoints support the `Emisor` header:
+
+- `POST /consulta/ruc` - RUC consultation (`ConsultaRucResource.java:31`)
+- `POST /consulta/de` - DE consultation (`ConsultaDEResource.java:45`)
+- `POST /consulta/lote` - Batch consultation (`ConsultaLoteResource.java:35`)
+- `POST /factura/xml/generar` - Generate invoice XML (`FacturaXmlGenerarResource.java:35`)
+- `POST /factura/recibe` - Receive invoice (`AsyncRecibeResource.java:41`)
+- `POST /evento/cancelar` - Cancel event (`EventoCancelarResource.java:34`)
+
+## Troubleshooting
+
+### Configuration Not Found
+
+If a client configuration is missing, JSIFEN falls back to the default configuration. To ensure client-specific configuration is used:
+
+1. Verify the property prefix matches the `Emisor` header exactly
+2. Check for typos in property names
+3. Ensure all required properties are set for that client
+
+### Wrong Certificate Used
+
+If the wrong certificate is being used:
+
+1. Check that `sifen.{CLIENT_ID}.keystore.path` is set correctly
+2. Verify the `Emisor` header is being sent in the request
+3. Check the application logs for "Emisor actual: ..." messages (`EmisorContext.java:11`)
+
+### Header Not Recognized
+
+If the `Emisor` header is not being recognized:
+
+1. Ensure the header name is exactly `Emisor` (case-sensitive)
+2. Verify your HTTP client is sending the header correctly
+3. Check for any proxy or middleware that might be removing headers
+
+## Next Steps
+
+- Review [certificate management](/configuration/certificates) for each client
+- Set up [SIFEN credentials](/configuration/sifen-setup) for each tenant
+- Explore the [API Reference](/api/invoices/generate-xml) for all supported endpoints

@@ -1,0 +1,140 @@
+---
+title: 'Cancel Event'
+description: 'Cancel an electronic tax document event via SOAP and receive a JSON response'
+api: 'POST /evento/cancelar'
+---
+
+## Overview
+
+The Cancel Event endpoint allows you to cancel a previously submitted electronic tax document event. This operation sends a cancellation request via SOAP to the tax authority system and returns the result in JSON format.
+
+<Warning>
+Event cancellation is irreversible. Once an event is cancelled, it cannot be restored. Ensure you have the correct CDC (Document Control Code) before proceeding with cancellation.
+</Warning>
+
+## Use Cases
+
+- Cancel an electronic invoice due to data errors
+- Revoke a tax document before it is processed by the recipient
+- Correct submission mistakes by cancelling and resubmitting
+- Handle customer refund scenarios requiring document cancellation
+
+## Authentication
+
+This endpoint requires authentication via headers:
+
+<ParamField header="token" type="string" required>
+  Authentication token for API access
+</ParamField>
+
+<ParamField header="Emisor" type="string">
+  Issuer identifier. If not provided or blank, the system will use the default issuer context.
+</ParamField>
+
+## Request Body
+
+<ParamField body="cdc" type="string" required>
+  CDC (Código de Control del Documento) - The unique control code of the document to be cancelled. This is a 44-character alphanumeric code assigned when the document was originally submitted.
+</ParamField>
+
+<ParamField body="motivo" type="string" required>
+  Reason for cancellation. Provide a clear explanation of why the event is being cancelled. This will be sent to the tax authority and may be visible to the recipient.
+</ParamField>
+
+## Response Fields
+
+<ResponseField name="fechaProceso" type="string">
+  Processing date and time when the cancellation was processed by the tax authority system
+</ResponseField>
+
+<ResponseField name="estadoResultado" type="string">
+  Result status of the cancellation operation (e.g., "Aprobado", "Rechazado")
+</ResponseField>
+
+<ResponseField name="protocoloAut" type="string">
+  Authorization protocol number assigned by the tax authority for this cancellation
+</ResponseField>
+
+<ResponseField name="identificador" type="string">
+  Unique identifier assigned to this cancellation transaction
+</ResponseField>
+
+<ResponseField name="codigoResultado" type="string">
+  Result code indicating the outcome of the cancellation request
+</ResponseField>
+
+<ResponseField name="mensajeResultado" type="string">
+  Detailed message describing the result of the cancellation operation
+</ResponseField>
+
+## Request Example
+
+```bash
+curl -X POST https://api.jsifen.com/evento/cancelar \
+  -H "Content-Type: application/json" \
+  -H "token: your-auth-token-here" \
+  -H "Emisor: 80012345-6" \
+  -d '{
+    "cdc": "01800123456001001000100012345678901234567890123",
+    "motivo": "Error en datos del documento - Corrección requerida"
+  }'
+```
+
+## Response Example
+
+### Successful Cancellation
+
+```json
+{
+  "fechaProceso": "2026-03-08T14:30:45",
+  "estadoResultado": "Aprobado",
+  "protocoloAut": "12345678901234",
+  "identificador": "9876543210",
+  "codigoResultado": "0000",
+  "mensajeResultado": "Evento de cancelación procesado correctamente"
+}
+```
+
+### Failed Cancellation
+
+```json
+{
+  "fechaProceso": "2026-03-08T14:30:45",
+  "estadoResultado": "Rechazado",
+  "protocoloAut": "",
+  "identificador": "9876543211",
+  "codigoResultado": "0301",
+  "mensajeResultado": "CDC no encontrado o ya ha sido cancelado previamente"
+}
+```
+
+## Error Handling
+
+### HTTP 500 - Internal Server Error
+
+If the cancellation process encounters an error, the API returns a 500 status code with an error message:
+
+```json
+"Error interno: [error details]"
+```
+
+Common error scenarios:
+- Invalid CDC format or CDC not found in the system
+- Document has already been cancelled
+- SOAP service connection issues
+- Authentication or authorization failures
+
+### Best Practices
+
+1. **Verify CDC**: Always double-check the CDC before cancelling to avoid cancelling the wrong document
+2. **Provide Clear Reasons**: Use descriptive cancellation reasons for audit trail purposes
+3. **Store Protocol Number**: Save the `protocoloAut` from successful cancellations for your records
+4. **Handle Errors Gracefully**: Implement proper error handling for failed cancellation attempts
+5. **Check Status**: Always verify the `estadoResultado` field to confirm successful cancellation
+
+## Additional Notes
+
+- The cancellation request is sent to the tax authority via SOAP protocol
+- The response is transformed from SOAP/XML to JSON format for easier integration
+- Cancellation requests are synchronous - you will receive immediate confirmation
+- Keep the `protocoloAut` for compliance and audit purposes

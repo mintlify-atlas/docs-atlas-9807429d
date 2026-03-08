@@ -1,0 +1,214 @@
+---
+title: Error Handling
+description: Learn how to handle errors when working with the JSIFEN API
+---
+
+## Overview
+
+The JSIFEN API uses standard HTTP status codes and returns error messages in a consistent format. Understanding how to handle these errors is crucial for building robust integrations.
+
+## HTTP Status Codes
+
+The API uses the following HTTP status codes:
+
+| Status Code | Description |
+|-------------|-------------|
+| `200` | Success - Request completed successfully |
+| `500` | Internal Server Error - Something went wrong on the server |
+| `503` | Service Unavailable - SIFEN service is down or unreachable |
+
+## Error Response Format
+
+When an error occurs, the API returns a response with an error message:
+
+```json
+{
+  "error": "Error interno: Failed to query RUC",
+  "message": "Description of what went wrong"
+}
+```
+
+Or in some cases, a simple string message:
+
+```text
+Error interno: Connection timeout
+```
+
+## Common Error Scenarios
+
+### SIFEN Service Errors
+
+When the SIFEN service returns an error or is unavailable:
+
+```java
+try {
+    ConsultarRucResponse response = consultarRucUseCase.execute(request.getRuc());
+    return Response
+        .status(Response.Status.OK)
+        .entity(response)
+        .build();
+} catch (Exception e) {
+    return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+        .entity("Error interno: " + e.getMessage())
+        .build();
+}
+```
+
+From `ConsultaRucResource.java:48-53`
+
+### Invalid Request Data
+
+When invalid data is provided (e.g., invalid RUC number), the SIFEN service will return an error in the response:
+
+```json
+{
+  "statusCode": 400,
+  "error": "RUC inválido",
+  "datosRUC": null
+}
+```
+
+### SSL/Certificate Errors
+
+If there are issues with the SSL certificate configuration:
+
+```java
+try {
+    SSLContext sslContext = sslConfig.createSSLContext(emisor);
+    HttpClient httpClient = HttpClient.newBuilder()
+        .sslContext(sslContext)
+        .build();
+} catch (Exception e) {
+    throw new RuntimeException("Failed to query RUC", e);
+}
+```
+
+From `RucClient.java:38-61`
+
+<Warning>
+Ensure your PKCS12 certificate is properly configured in `sifen.properties`. Certificate errors will result in connection failures.
+</Warning>
+
+## Error Handling Patterns
+
+### Try-Catch Pattern
+
+All REST resource classes follow a consistent try-catch pattern:
+
+```java
+@POST
+public Response asyncRecibe(
+    @HeaderParam("token") String token,
+    @HeaderParam("Emisor") String emisor,
+    String json
+) {
+    try {
+        if (emisor == null || emisor.isBlank()) {
+            emisor = null;
+        }
+        emisorContext.setEmisor(emisor);
+        
+        JsonObject jsonObject = Json.createReader(new StringReader(json))
+            .readObject();
+        JsonObject jsonResponse = recibirFacturaUseCase.execute(jsonObject);
+        
+        return Response
+            .status(Response.Status.OK)
+            .entity(jsonResponse)
+            .build();
+    } catch (Exception e) {
+        return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+            .entity("Error interno: " + e.getMessage())
+            .build();
+    }
+}
+```
+
+From `AsyncRecibeResource.java:151-173`
+
+### Health Check Pattern
+
+Use the health check endpoint to verify SIFEN service availability:
+
+```java
+@GET
+@Path("/{env}")
+public Response check(
+    @PathParam("env") String env,
+    @QueryParam("emisor") String emisor
+) {
+    HealthStatus status = sifenHealthUseCase.check(env, emisor);
+    
+    return Response
+        .status("UP".equals(status.getStatus()) ? 200 : 503)
+        .entity(status)
+        .build();
+}
+```
+
+From `SifenHealthResource.java:16-29`
+
+## SOAP Error Processing
+
+The infrastructure layer processes SOAP responses and handles XML parsing errors:
+
+```java
+public static String cleanXmlForJson(String responseXML) {
+    if (responseXML == null) return null;
+    
+    String output = responseXML;
+    output = output.replace("&lt;", "<");
+    output = output.replace("<?xml version=\"1.0\" encoding=\"UTF-8\"?>", "");
+    output = StringUtils.decodeEntities(output);
+    
+    // Handle specific SIFEN response patterns
+    if (output.contains("<ns2:dMsgRes>CDC encontrado</ns2:dMsgRes>")) {
+        // Extract DE element
+    }
+    
+    return output.trim();
+}
+```
+
+From `SifenResponseProcessor.java:9-37`
+
+## Best Practices
+
+1. **Always handle exceptions** - Wrap SIFEN API calls in try-catch blocks
+2. **Check response status** - Verify the HTTP status code before processing the response
+3. **Log errors** - Include detailed error messages for troubleshooting
+4. **Use health checks** - Monitor SIFEN service availability before making requests
+5. **Validate input** - Check request data before sending to SIFEN
+6. **Handle timeouts** - Implement retry logic for network timeouts
+7. **Certificate validation** - Ensure SSL certificates are valid and not expired
+
+## Testing Error Scenarios
+
+Test different error scenarios in your integration tests:
+
+```java
+@Test
+void testRucInvalido() {
+    JsonObject response = consultarRucUseCase.execute("0");
+    assertNotNull(response);
+    assertTrue(response.containsKey("error") || response.containsKey("statusCode"));
+    System.out.println("RUC inválido: " + response);
+}
+
+@Test
+void testRucNull() {
+    JsonObject response = consultarRucUseCase.execute(null);
+    assertNotNull(response);
+    System.out.println("RUC null: " + response);
+}
+```
+
+From `ConsultaRucResourceTest.java:35-47`
+
+## Debugging Tips
+
+- Check application logs for detailed stack traces
+- Verify SIFEN service status using the health endpoint: `GET /health/sifen/{env}`
+- Validate your `sifen.properties` configuration
+- Test with the SIFEN test environment before production
+- Use the Swagger UI at `http://localhost:8000/doc/swagger` to test endpoints

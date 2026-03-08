@@ -1,0 +1,365 @@
+---
+title: Deployment
+description: Learn how to deploy JSIFEN to different environments
+---
+
+## Overview
+
+JSIFEN can be deployed in multiple ways: development mode for rapid iteration, production JAR for traditional deployments, or Docker containers for cloud environments.
+
+## Development Mode
+
+For local development with hot reload:
+
+```bash
+./gradlew quarkusDev
+```
+
+This starts the application with:
+- Automatic code reloading on changes
+- Dev UI available at `http://localhost:8000/q/dev`
+- API documentation at `http://localhost:8000/doc/swagger`
+
+<Warning>
+Development mode is not suitable for production. Use production builds for deployment.
+</Warning>
+
+## Production Build
+
+### Building the Application
+
+Compile and package the application:
+
+```bash
+./gradlew build
+```
+
+This creates the production-ready package in:
+
+```
+build/quarkus-app/
+├── quarkus-run.jar
+├── app/
+├── lib/
+├── quarkus/
+└── config/
+    ├── application.properties
+    └── sifen.properties
+```
+
+From `README.md:56-70`
+
+### Running the JAR
+
+Execute the application with configuration from the `config/` directory:
+
+```bash
+cd build/quarkus-app
+java -Dquarkus.config.locations=./config -jar quarkus-run.jar
+```
+
+From `README.md:79-82`
+
+## Configuration Management
+
+### Application Properties
+
+Edit `config/application.properties` for basic settings:
+
+```properties
+quarkus.http.port=8000
+quarkus.swagger-ui.path=/doc/swagger
+```
+
+From `application.properties:1-3`
+
+### SIFEN Properties
+
+Edit `config/sifen.properties` with your credentials:
+
+```properties
+sifen.id-csc=123                    # ID CSC proporcionado por SIFEN
+sifen.csc=ABCD                      # Código CSC proporcionado por SIFEN
+sifen.ambiente=prod                 # Ambiente (prod/test)
+sifen.keystore.path=/ruta/al/certificado.p12  # Ruta al certificado
+sifen.keystore.password=ABCD12345   # Contraseña del certificado
+```
+
+From `README.md:27-36`
+
+<Warning>
+Never commit `sifen.properties` with production credentials to version control. Use environment-specific configuration files.
+</Warning>
+
+### Port Configuration
+
+Change the default port (8000) in `application.properties`:
+
+```properties
+quarkus.http.port=8080
+```
+
+From `README.md:38-43`
+
+## Docker Deployment
+
+### Building Docker Image
+
+JSIFEN includes multiple Dockerfile options:
+
+<CodeGroup>
+
+```bash JVM Mode
+# Build the application
+./gradlew build
+
+# Build Docker image
+docker build -f src/main/docker/Dockerfile.jvm -t jsifen:latest .
+```
+
+```bash Native Mode
+# Build native executable
+./gradlew build -Dquarkus.package.type=native
+
+# Build Docker image
+docker build -f src/main/docker/Dockerfile.native -t jsifen:native .
+```
+
+```bash Legacy JAR
+# Build with legacy JAR packaging
+./gradlew build -Dquarkus.package.type=legacy-jar
+
+# Build Docker image
+docker build -f src/main/docker/Dockerfile.legacy-jar -t jsifen:legacy .
+```
+
+</CodeGroup>
+
+From `Dockerfile.jvm:5-11`
+
+### Running Docker Container
+
+<CodeGroup>
+
+```bash Basic Run
+docker run -i --rm -p 8000:8000 jsifen:latest
+```
+
+```bash With Configuration
+docker run -i --rm \
+  -p 8000:8000 \
+  -v $(pwd)/config:/deployments/config \
+  -e JAVA_OPTS_APPEND="-Dquarkus.config.locations=/deployments/config" \
+  jsifen:latest
+```
+
+```bash With Debug Port
+docker run -i --rm \
+  -p 8000:8000 \
+  -p 5005:5005 \
+  -e JAVA_DEBUG=true \
+  -e JAVA_DEBUG_PORT=*:5005 \
+  jsifen:latest
+```
+
+</CodeGroup>
+
+### Docker Environment Variables
+
+Customize the JVM with environment variables:
+
+| Variable | Description | Example |
+|----------|-------------|----------|
+| `JAVA_OPTS_APPEND` | Additional JVM options | `-Xmx512m -Xms256m` |
+| `JAVA_DEBUG` | Enable remote debugging | `true` |
+| `JAVA_DEBUG_PORT` | Debug port | `*:5005` |
+| `JAVA_MAX_MEM_RATIO` | Max heap memory ratio | `50` |
+
+From `Dockerfile.jvm:29-46`
+
+## Environment-Specific Deployment
+
+### Development Environment
+
+```bash
+# Use test SIFEN environment
+sifen.ambiente=test
+sifen.keystore.path=/path/to/test-cert.p12
+quarkus.http.port=8000
+```
+
+### Production Environment
+
+```bash
+# Use production SIFEN environment
+sifen.ambiente=prod
+sifen.keystore.path=/path/to/prod-cert.p12
+quarkus.http.port=8080
+```
+
+## System Requirements
+
+- **Java**: 17 or higher (Java 21 LTS recommended)
+- **OS**: Linux, macOS, or Windows
+- **Certificate**: PKCS12 certificate required for SIFEN connection
+- **Port**: Default 8000 (configurable)
+- **Memory**: Minimum 512MB RAM recommended
+
+From `README.md:109-115`
+
+## Deployment Checklist
+
+1. **Build the application**
+   ```bash
+   ./gradlew build
+   ```
+
+2. **Copy build artifacts to target server**
+   ```bash
+   scp -r build/quarkus-app user@server:/opt/jsifen/
+   ```
+
+3. **Configure environment-specific properties**
+   - Edit `config/sifen.properties` with production credentials
+   - Edit `config/application.properties` for port and other settings
+
+4. **Ensure certificate is accessible**
+   ```bash
+   # Verify certificate path in sifen.properties
+   ls -l /path/to/certificate.p12
+   ```
+
+5. **Start the application**
+   ```bash
+   cd /opt/jsifen/quarkus-app
+   java -Dquarkus.config.locations=./config -jar quarkus-run.jar
+   ```
+
+6. **Verify deployment**
+   ```bash
+   curl http://localhost:8000/health/sifen/prod
+   ```
+
+7. **Check API documentation**
+   - Navigate to `http://localhost:8000/doc/swagger`
+
+## Process Management
+
+### Using systemd (Linux)
+
+Create a systemd service file at `/etc/systemd/system/jsifen.service`:
+
+```ini
+[Unit]
+Description=JSIFEN API Service
+After=network.target
+
+[Service]
+Type=simple
+User=jsifen
+WorkingDirectory=/opt/jsifen/quarkus-app
+ExecStart=/usr/bin/java -Dquarkus.config.locations=./config -jar quarkus-run.jar
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Manage the service:
+
+```bash
+# Start service
+sudo systemctl start jsifen
+
+# Enable auto-start on boot
+sudo systemctl enable jsifen
+
+# Check status
+sudo systemctl status jsifen
+
+# View logs
+journalctl -u jsifen -f
+```
+
+### Using Docker Compose
+
+Create `docker-compose.yml`:
+
+```yaml
+version: '3.8'
+services:
+  jsifen:
+    image: jsifen:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./config:/deployments/config
+      - ./certs:/certs
+    environment:
+      - JAVA_OPTS_APPEND=-Dquarkus.config.locations=/deployments/config
+    restart: unless-stopped
+```
+
+Run with:
+
+```bash
+docker-compose up -d
+```
+
+## Monitoring and Health Checks
+
+Verify the application is running:
+
+```bash
+# Check SIFEN connection in production
+curl http://localhost:8000/health/sifen/prod
+
+# Check SIFEN connection in test
+curl http://localhost:8000/health/sifen/test
+```
+
+Expected response:
+
+```json
+{
+  "status": "UP",
+  "environment": "prod",
+  "timestamp": "2026-03-08T10:30:00Z"
+}
+```
+
+## Troubleshooting
+
+### Application won't start
+
+1. Check Java version: `java -version` (must be 17+)
+2. Verify port is not in use: `lsof -i :8000`
+3. Check certificate path in `sifen.properties`
+4. Review logs for specific errors
+
+### Certificate errors
+
+1. Verify certificate exists: `ls -l /path/to/cert.p12`
+2. Test certificate password
+3. Ensure certificate is not expired
+4. Check file permissions: `chmod 600 cert.p12`
+
+### Connection to SIFEN fails
+
+1. Check network connectivity
+2. Verify `sifen.ambiente` setting (prod/test)
+3. Test SIFEN health endpoint: `/health/sifen/{env}`
+4. Review firewall rules
+5. Check SSL/TLS configuration
+
+## API Documentation Access
+
+After deployment, access the interactive API documentation:
+
+- **Swagger UI**: `http://your-server:8000/doc/swagger`
+- **ReDoc**: `http://your-server:8000/doc/redoc`
+- **RapiDoc**: `http://your-server:8000/doc/rapidoc`
+- **Stoplight**: `http://your-server:8000/doc/stoplight`
+
+From `README.md:84-98`

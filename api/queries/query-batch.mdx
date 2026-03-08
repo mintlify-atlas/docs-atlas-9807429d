@@ -1,0 +1,176 @@
+---
+title: 'Query Batch'
+api: 'POST /consulta/lote'
+description: 'Query multiple electronic documents in batch by batch ID'
+---
+
+## Overview
+
+Query the results of a batch submission using the batch identifier (lote). This endpoint allows you to check the processing status of multiple electronic documents that were submitted together in a single batch.
+
+## Authentication
+
+<ParamField header="token" type="string" required>
+  Authentication token for API access
+</ParamField>
+
+<ParamField header="Emisor" type="string">
+  Emisor identifier. If not provided, the default emisor will be used
+</ParamField>
+
+## Request
+
+### Request Body
+
+<ParamField body="lote" type="string" required>
+  The batch identifier (lote) returned when the batch was originally submitted
+</ParamField>
+
+### Example Request
+
+```bash
+curl -X POST https://api.jsifen.com/consulta/lote \
+  -H "Content-Type: application/json" \
+  -H "token: your-api-token" \
+  -H "Emisor: 80012345-7" \
+  -d '{
+    "lote": "202603081234567890"
+  }'
+```
+
+## Response
+
+### Response Fields
+
+<ResponseField name="codigoLote" type="string">
+  Response code for the batch query
+</ResponseField>
+
+<ResponseField name="mensajeLote" type="string">
+  Descriptive message about the batch processing status
+</ResponseField>
+
+<ResponseField name="resultados" type="array">
+  Array of individual document results within the batch
+  
+  <ResponseField name="cdc" type="string">
+    The 44-character CDC of the document
+  </ResponseField>
+  
+  <ResponseField name="estado" type="string">
+    Processing status of the document (e.g., "Aprobado", "Rechazado", "Procesando")
+  </ResponseField>
+  
+  <ResponseField name="codigoError" type="integer">
+    Error code if the document was rejected (null if approved)
+  </ResponseField>
+  
+  <ResponseField name="mensajeError" type="string">
+    Error message explaining why the document was rejected (null if approved)
+  </ResponseField>
+</ResponseField>
+
+### Success Response (200 OK)
+
+```json
+{
+  "codigoLote": "0",
+  "mensajeLote": "Lote procesado correctamente",
+  "resultados": [
+    {
+      "cdc": "12345678901234567890123456789012345678901234",
+      "estado": "Aprobado",
+      "codigoError": null,
+      "mensajeError": null
+    },
+    {
+      "cdc": "98765432109876543210987654321098765432109876",
+      "estado": "Aprobado",
+      "codigoError": null,
+      "mensajeError": null
+    },
+    {
+      "cdc": "11111111111111111111111111111111111111111111",
+      "estado": "Rechazado",
+      "codigoError": 3001,
+      "mensajeError": "RUC del emisor no válido"
+    }
+  ]
+}
+```
+
+### Batch Still Processing
+
+```json
+{
+  "codigoLote": "1",
+  "mensajeLote": "Lote en proceso",
+  "resultados": [
+    {
+      "cdc": "12345678901234567890123456789012345678901234",
+      "estado": "Procesando",
+      "codigoError": null,
+      "mensajeError": null
+    }
+  ]
+}
+```
+
+### Error Response (500)
+
+```json
+Error interno: [error message]
+```
+
+## Document States
+
+The `estado` field in each result can have the following values:
+
+- **Aprobado**: Document was successfully approved by SIFEN
+- **Rechazado**: Document was rejected (see `codigoError` and `mensajeError`)
+- **Procesando**: Document is still being processed
+- **En Cola**: Document is queued for processing
+
+## Use Cases
+
+### High-Volume Document Processing
+
+Ideal for scenarios where multiple electronic documents need to be submitted simultaneously:
+
+- **End-of-day invoice batches**: Submit all daily invoices in a single batch
+- **Periodic billing cycles**: Process monthly billing for multiple customers
+- **Bulk corrections**: Resubmit corrected versions of rejected documents
+- **System migrations**: Transfer historical documents to SIFEN
+
+### Efficient Status Monitoring
+
+Query batch status instead of individual documents:
+
+- **Single API call**: Check multiple document statuses at once
+- **Reduced API requests**: More efficient than querying each CDC individually
+- **Batch-level insights**: Understand overall processing success rate
+- **Error aggregation**: Identify common rejection reasons across documents
+
+### Asynchronous Processing Workflows
+
+1. Submit a batch of documents
+2. Receive a batch ID (lote)
+3. Poll this endpoint periodically to check processing status
+4. Process results when all documents are complete
+5. Handle any rejected documents based on error codes
+
+## Best Practices
+
+- **Polling interval**: Wait at least 30-60 seconds between status queries to avoid excessive API calls
+- **Timeout handling**: Implement a maximum wait time for batch processing (e.g., 5 minutes)
+- **Error handling**: Have a strategy for resubmitting rejected documents
+- **Logging**: Store batch IDs and results for audit trails
+- **Partial success**: Handle scenarios where some documents succeed and others fail
+
+## Error Handling
+
+The endpoint returns HTTP 500 with an error message if:
+- The batch ID (lote) is invalid or not found
+- SIFEN service is unavailable
+- Authentication fails
+- Network or internal processing errors occur

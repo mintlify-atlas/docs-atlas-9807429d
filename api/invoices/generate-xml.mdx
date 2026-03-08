@@ -1,0 +1,202 @@
+---
+title: "Generate Signed XML"
+api: "POST /factura/xml/generar"
+description: "Generates and returns a signed XML document from invoice JSON data"
+---
+
+This endpoint receives an invoice in JSON format and returns the complete signed XML document along with invoice metadata. The XML is digitally signed and includes a QR code for validation.
+
+## Authentication
+
+<ParamField header="token" type="string" required>
+  Authentication token for API access
+</ParamField>
+
+<ParamField header="Emisor" type="string">
+  Multi-tenant identifier for the issuing entity. Optional - if not provided or blank, the default emisor will be used.
+</ParamField>
+
+## Request Body
+
+The request body should contain a complete invoice in JSON format following the Paraguayan electronic invoice structure.
+
+<ParamField body="iTipEmi" type="integer" required>
+  Emission type (e.g., 1 = Normal)
+</ParamField>
+
+<ParamField body="iTiDE" type="integer" required>
+  Document type (e.g., 1 = Electronic invoice)
+</ParamField>
+
+<ParamField body="dNumTim" type="integer" required>
+  Timbrado number
+</ParamField>
+
+<ParamField body="dEst" type="string" required>
+  Establishment code (3 digits)
+</ParamField>
+
+<ParamField body="dPunExp" type="string" required>
+  Point of sale code (3 digits)
+</ParamField>
+
+<ParamField body="dNumDoc" type="string" required>
+  Document number
+</ParamField>
+
+<ParamField body="dFeEmiDE" type="string" required>
+  Emission date and time (ISO 8601 format: YYYY-MM-DDTHH:mm:ss)
+</ParamField>
+
+<ParamField body="dRucEm" type="integer" required>
+  Issuer RUC (tax identification number)
+</ParamField>
+
+<ParamField body="dDVEmi" type="integer" required>
+  Issuer verification digit
+</ParamField>
+
+<ParamField body="dNomEmi" type="string" required>
+  Issuer legal name
+</ParamField>
+
+<ParamField body="dNumIDRec" type="string" required>
+  Receiver identification number
+</ParamField>
+
+<ParamField body="dNomRec" type="string" required>
+  Receiver name
+</ParamField>
+
+<ParamField body="dTotGralOpe" type="string" required>
+  Total operation amount
+</ParamField>
+
+<ParamField body="Detalles" type="array" required>
+  Array of invoice line items. Each item should include product/service description, quantity, unit price, and tax information.
+</ParamField>
+
+<Note>
+  The request body accepts the complete SIFEN invoice JSON structure. See the [Invoice Structure](/api/invoices/receive-invoice) documentation for a complete example.
+</Note>
+
+## Response
+
+<ResponseField name="cdc" type="string">
+  CDC (Código de Control) - Unique control code for the electronic document
+</ResponseField>
+
+<ResponseField name="numeroFactura" type="string">
+  Invoice number extracted from the XML
+</ResponseField>
+
+<ResponseField name="tipoDocumento" type="integer">
+  Document type code
+</ResponseField>
+
+<ResponseField name="fechaEmision" type="string">
+  Emission date extracted from the XML
+</ResponseField>
+
+<ResponseField name="xml" type="string">
+  Complete signed XML document with digital signature and QR code
+</ResponseField>
+
+<RequestExample>
+```bash cURL
+curl -X POST https://api.example.com/factura/xml/generar \
+  -H "Content-Type: application/json" \
+  -H "token: your-api-token" \
+  -H "Emisor: your-emisor-id" \
+  -d '{
+    "iTipEmi": 1,
+    "dDesTipEmi": "Normal",
+    "dCodSeg": "572819034",
+    "iTiDE": 1,
+    "dDesTiDE": "Factura electrónica",
+    "dNumTim": 77441122,
+    "dEst": "003",
+    "dPunExp": "004",
+    "dNumDoc": "0000789",
+    "dFeEmiDE": "2025-09-27T16:45:10",
+    "iTipTra": 2,
+    "dDesTipTra": "Prestación de servicios",
+    "iTImp": 1,
+    "dDesTImp": "IVA",
+    "cMoneOpe": "PYG",
+    "dDesMoneOpe": "Guarani",
+    "dRucEm": 4839205,
+    "dDVEmi": 4,
+    "iTipCont": 2,
+    "dNomEmi": "SERVITEC S.R.L.",
+    "dDirEmi": "AV. CENTRAL KM 5",
+    "dNumCas": 150,
+    "dTelEmi": "0982123456",
+    "dEmailE": "info@servitec.com.py",
+    "iNatRec": 2,
+    "iTiOpe": 1,
+    "iTipIDRec": "1",
+    "dNumIDRec": "45678901",
+    "dNomRec": "COMERCIAL EL PUENTE S.A.",
+    "dTotGralOpe": "250000.0",
+    "dTotIVA": 22727,
+    "Detalles": [
+      {
+        "dCodInt": "A-991",
+        "dDesProSer": "SERVICIO DE CONSULTORÍA TÉCNICA",
+        "cUniMed": "77",
+        "dCantProSer": "1.0",
+        "dPUniProSer": "250000.0",
+        "dTotOpeItem": "250000.0",
+        "iAfecIVA": "1",
+        "dTasaIVA": "10",
+        "dLiqIVAItem": "22727"
+      }
+    ]
+  }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 OK
+{
+  "cdc": "01800695631001003000124566202509271645108857294613",
+  "numeroFactura": "003-004-0000789",
+  "tipoDocumento": 1,
+  "fechaEmision": "2025-09-27T16:45:10",
+  "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rDE xmlns=\"http://ekuatia.set.gov.py/sifen/xsd\">\n  <DE Id=\"...\">....</DE>\n  <Signature xmlns=\"http://www.w3.org/2000/09/xmldsig#\">...</Signature>\n  <gCamGen>\n    <gCamQR>\n      <dQRCode>...</dQRCode>\n    </gCamQR>\n  </gCamGen>\n</rDE>"
+}
+```
+
+```json 500 Internal Server Error
+{
+  "error": "Error al generar XML firmado: Invalid invoice structure"
+}
+```
+</ResponseExample>
+
+## Processing Flow
+
+The endpoint performs the following operations:
+
+1. **Validation**: Validates the emisor context and JSON structure
+2. **XML Generation**: Converts the JSON invoice to SIFEN-compliant XML format
+3. **Digital Signature**: Applies digital signature to the XML document
+4. **QR Code**: Adds QR code node for mobile verification
+5. **Metadata Extraction**: Extracts CDC, invoice number, document type, and emission date
+
+<Note>
+  The generated XML is fully compliant with SIFEN (Sistema de Facturación Electrónica Nacional) requirements and includes all necessary elements for submission to the SET (Subsecretaría de Estado de Tributación).
+</Note>
+
+## Error Responses
+
+The endpoint returns a 500 Internal Server Error status code when:
+
+- The JSON structure is invalid or incomplete
+- Required fields are missing
+- The XML generation process fails
+- The digital signature process fails
+- The emisor configuration is invalid
+
+Error messages are returned in plain text format describing the specific error encountered.

@@ -1,0 +1,163 @@
+---
+title: 'Query Electronic Document (DE)'
+api: 'POST /consulta/de/{format}'
+description: 'Query an electronic document by CDC (Control Code) with XML or JSON response'
+---
+
+## Overview
+
+Query an electronic document from SIFEN using its CDC (Código de Control). This endpoint supports two response formats:
+- **XML**: Returns the raw XML response from SIFEN
+- **JSON**: Returns a converted JSON response
+
+## Authentication
+
+Both endpoints require authentication via header parameters:
+
+<ParamField header="token" type="string" required>
+  Authentication token for API access
+</ParamField>
+
+<ParamField header="Emisor" type="string">
+  Emisor identifier. If not provided, the default emisor will be used
+</ParamField>
+
+## CDC Format
+
+The CDC (Código de Control) must be exactly **44 characters** long. It uniquely identifies an electronic document in the SIFEN system.
+
+## POST /consulta/de/xml
+
+Returns the electronic document information in XML format.
+
+### Request Body
+
+<ParamField body="cdc" type="string" required>
+  The 44-character CDC of the document to query
+</ParamField>
+
+### Example Request
+
+```bash
+curl -X POST https://api.jsifen.com/consulta/de/xml \
+  -H "Content-Type: application/json" \
+  -H "token: your-api-token" \
+  -H "Emisor: 80012345-7" \
+  -d '{
+    "cdc": "12345678901234567890123456789012345678901234"
+  }'
+```
+
+### Response
+
+<ResponseField name="XML Response" type="string">
+  Returns the complete XML response from SIFEN containing the electronic document details
+</ResponseField>
+
+#### Success Response (200 OK)
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<rResEnviDe>
+  <dCodRes>0</dCodRes>
+  <dMsgRes>Documento procesado correctamente</dMsgRes>
+  <gResProc>
+    <dEstado>Aprobado</dEstado>
+    <dCodRes>0260</dCodRes>
+  </gResProc>
+</rResEnviDe>
+```
+
+#### Error Response (500)
+
+```xml
+Error interno: [error message]
+```
+
+## POST /consulta/de/json
+
+Returns the electronic document information in JSON format (converted from XML).
+
+### Request Body
+
+<ParamField body="cdc" type="string" required>
+  The 44-character CDC of the document to query
+</ParamField>
+
+### Example Request
+
+```bash
+curl -X POST https://api.jsifen.com/consulta/de/json \
+  -H "Content-Type: application/json" \
+  -H "token: your-api-token" \
+  -H "Emisor: 80012345-7" \
+  -d '{
+    "cdc": "12345678901234567890123456789012345678901234"
+  }'
+```
+
+### Response
+
+<ResponseField name="rResEnviDe" type="object">
+  Root response object containing the query result
+  
+  <ResponseField name="dCodRes" type="string">
+    Response code from SIFEN
+  </ResponseField>
+  
+  <ResponseField name="dMsgRes" type="string">
+    Response message describing the result
+  </ResponseField>
+  
+  <ResponseField name="gResProc" type="object">
+    Processing result details
+    
+    <ResponseField name="dEstado" type="string">
+      Document status (e.g., "Aprobado", "Rechazado")
+    </ResponseField>
+    
+    <ResponseField name="dCodRes" type="string">
+      Processing result code
+    </ResponseField>
+  </ResponseField>
+</ResponseField>
+
+#### Success Response (200 OK)
+
+```json
+{
+  "rResEnviDe": {
+    "dCodRes": "0",
+    "dMsgRes": "Documento procesado correctamente",
+    "gResProc": {
+      "dEstado": "Aprobado",
+      "dCodRes": "0260"
+    }
+  }
+}
+```
+
+#### Error Response (500)
+
+```json
+{
+  "error": "Error description"
+}
+```
+
+## Error Handling
+
+Both endpoints return HTTP 500 with error details if:
+- The CDC is invalid or malformed
+- The document is not found
+- SIFEN service is unavailable
+- Authentication fails
+- Any internal processing error occurs
+
+## Use Cases
+
+- Verify the status of a submitted electronic document
+- Check if a document has been approved or rejected
+- Retrieve document processing details
+- Monitor document status changes
+- Integration with external systems requiring different formats (XML vs JSON)

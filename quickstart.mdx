@@ -1,80 +1,154 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: 'Quickstart'
+description: 'Get JSIFEN up and running in under 10 minutes'
 ---
 
-## Get started in three steps
+This guide will help you quickly set up JSIFEN and make your first API call to Paraguay's SIFEN electronic invoicing system.
 
-Get your documentation site running locally and make your first customization.
+## Prerequisites
 
-### Step 1: Set up your local environment
+Before you begin, ensure you have:
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+- **Java 17+** installed (Java 21 LTS recommended)
+- **Git** for cloning the repository
+- **SIFEN credentials**: ID CSC and CSC code
+- **PKCS12 certificate** (`.p12` file) for SIFEN authentication
 
-### Step 2: Deploy your changes
+<Steps>
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+### Clone the repository
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+Clone the JSIFEN repository to your local machine:
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+```bash
+git clone https://github.com/your-org/jsifen.git
+cd jsifen
+```
 
-### Step 3: Go live
+### Configure SIFEN credentials
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+Edit the `src/main/resources/sifen.properties` file with your credentials:
 
-## Next steps
+```properties
+# SIFEN Environment (prod/test)
+sifen.ambiente=test
+sifen.id-csc=0001
+sifen.csc=your-csc-code-here
+sifen.keystore.path=/path/to/your/certificate.p12
+sifen.keystore.password=your-certificate-password
+```
 
-Now that you have your docs running, explore these key features:
+<Warning>
+  Keep your credentials secure! Never commit `sifen.properties` with real credentials to version control.
+</Warning>
+
+### Start the development server
+
+Run JSIFEN in development mode:
+
+```bash
+./gradlew quarkusDev
+```
+
+The server will start on port `8000` by default. You should see output indicating the server is running.
+
+<Tip>
+  Development mode includes hot-reload, so changes to your code will be automatically reflected without restarting the server.
+</Tip>
+
+### Verify the installation
+
+Check that the server is running and can connect to SIFEN:
+
+```bash
+curl http://localhost:8000/health/sifen/test
+```
+
+You should receive a response indicating the connection status:
+
+```json
+{
+  "status": "UP",
+  "timestamp": "2026-03-08T10:30:00Z"
+}
+```
+
+### Make your first API call
+
+Let's query information about a RUC (tax identification number):
+
+```bash
+curl -X POST http://localhost:8000/consulta/ruc \
+  -H "Content-Type: application/json" \
+  -d '{"ruc": "80012345-6"}'
+```
+
+Or consult an electronic document by CDC (Control Code):
+
+```bash
+curl -X POST http://localhost:8000/consulta/de/json \
+  -H "Content-Type: application/json" \
+  -d '{"cdc": "12345678901234567890123456789012345678901234"}'
+```
+
+</Steps>
+
+## Next Steps
 
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Explore the API" icon="book" href="http://localhost:8000/doc/swagger">
+    View the complete API documentation in Swagger UI
+  </Card>
+  <Card title="Production Deployment" icon="server" href="/deployment">
+    Learn how to build and deploy JSIFEN to production
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference">
+    Detailed documentation for all endpoints
+  </Card>
+  <Card title="Configuration" icon="gear" href="/configuration">
+    Advanced configuration options
+  </Card>
 </CardGroup>
 
+## Interactive API Documentation
+
+JSIFEN includes multiple API documentation formats accessible at `/doc/`:
+
+- **Swagger UI**: http://localhost:8000/doc/swagger
+- **Redoc**: http://localhost:8000/doc/redoc
+- **Stoplight**: http://localhost:8000/doc/stoplight
+- **RapiDoc**: http://localhost:8000/doc/rapidoc
+
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  All documentation interfaces provide the same API information in different formats. Choose the one you prefer!
 </Note>
+
+## Common Issues
+
+### Port already in use
+
+If port 8000 is already in use, modify `src/main/resources/application.properties`:
+
+```properties
+quarkus.http.port=8080
+```
+
+### Certificate path errors
+
+Ensure the certificate path in `sifen.properties` uses absolute paths:
+
+```properties
+# Linux/macOS
+sifen.keystore.path=/home/user/certificates/cert.p12
+
+# Windows
+sifen.keystore.path=C:/certificates/cert.p12
+```
+
+### Connection to SIFEN fails
+
+Verify:
+- Your credentials are correct
+- The certificate password is accurate
+- You're using the correct environment (`test` or `prod`)
+- Your network allows connections to SIFEN servers

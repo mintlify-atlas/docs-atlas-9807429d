@@ -1,0 +1,300 @@
+---
+title: Testing
+description: Learn how to test your JSIFEN API integration
+---
+
+## Overview
+
+JSIFEN uses Quarkus testing framework with JUnit 5 and REST Assured for comprehensive testing coverage. The project includes unit tests and integration tests.
+
+## Running Tests
+
+Execute all tests using Gradle:
+
+```bash
+./gradlew test
+```
+
+The test configuration outputs detailed logs for passed, skipped, and failed tests.
+
+## Test Configuration
+
+From `build.gradle:39-44`:
+
+```gradle
+test {
+    systemProperty "java.util.logging.manager", "org.jboss.logmanager.LogManager"
+    testLogging {
+        events "passed", "skipped", "failed", "standardOut", "standardError"
+    }
+}
+```
+
+## Test Dependencies
+
+The project uses these testing libraries:
+
+```gradle
+testImplementation 'io.quarkus:quarkus-junit5'
+testImplementation 'io.rest-assured:rest-assured'
+```
+
+## Integration Tests
+
+### QuarkusTest Annotation
+
+All integration tests use the `@QuarkusTest` annotation to start the Quarkus application:
+
+```java
+@QuarkusTest
+public class ConsultaRucResourceTest {
+    
+    @Inject
+    ConsultarRucUseCase consultarRucUseCase;
+    
+    @Test
+    void testRucExistente() {
+        JsonObject response = consultarRucUseCase.execute("3437941");
+        assertNotNull(response);
+        assertTrue(response.containsKey("datosRUC"));
+        System.out.println("RUC existente: " + response);
+    }
+}
+```
+
+From `ConsultaRucResourceTest.java:12-24`
+
+### Testing Use Cases
+
+Test use cases directly by injecting them:
+
+```java
+@Inject
+ConsultarRucUseCase consultarRucUseCase;
+
+@Test
+public void testInyeccionDependencias() {
+    // Verify dependency injection works
+    assertNotNull(consultarRucUseCase);
+}
+```
+
+From `ConsultaRucResourceTest.java:51-54`
+
+## Testing Patterns
+
+### RUC Query Tests
+
+Test different RUC scenarios:
+
+```java
+@Test
+void testRucExistente() {
+    JsonObject response = consultarRucUseCase.execute("3437941");
+    assertNotNull(response);
+    assertTrue(response.containsKey("datosRUC"));
+    System.out.println("RUC existente: " + response);
+}
+
+@Test
+void testRucNoExistente() {
+    JsonObject response = consultarRucUseCase.execute("100000");
+    assertNotNull(response);
+    assertTrue(response.containsKey("datosRUC"));
+    System.out.println("RUC no existe: " + response);
+}
+
+@Test
+void testRucInvalido() {
+    JsonObject response = consultarRucUseCase.execute("0");
+    assertNotNull(response);
+    assertTrue(response.containsKey("error") || response.containsKey("statusCode"));
+    System.out.println("RUC inválido: " + response);
+}
+
+@Test
+void testRucNull() {
+    JsonObject response = consultarRucUseCase.execute(null);
+    assertNotNull(response);
+    System.out.println("RUC null: " + response);
+}
+```
+
+From `ConsultaRucResourceTest.java:18-47`
+
+### Invoice Processing Tests
+
+Test invoice submission with complete JSON data:
+
+```java
+@QuarkusTest
+public class AsyncRecibeResourceTest {
+    
+    private static final String FACTURA_JSON = """
+    {
+        "iTipEmi":1,
+        "dDesTipEmi":"Normal",
+        "dCodSeg":"106381931",
+        "iTiDE":1,
+        "dDesTiDE":"Factura electrónica",
+        "dNumTim":16693341,
+        "dEst":"001",
+        "dPunExp":"002",
+        "dNumDoc":"0000090",
+        // ... more fields
+        "Detalles":[
+            {
+                "dCodInt":"6016",
+                "dDesProSer":"MERCADERIAS VARIOS 10%",
+                "cUniMed":"77",
+                "dDesUniMed":"UNI",
+                "dCantProSer":"1.0",
+                "dPUniProSer":"1000.0",
+                // ... more fields
+            }
+        ]
+    }
+    """;
+    
+    @Inject
+    RecibirFacturaUseCase recibirFacturaUseCase;
+    
+    @Test
+    void testdeintegracion() throws Exception {
+        JsonObject jsonObject = Json.createReader(new StringReader(FACTURA_JSON))
+            .readObject();
+        JsonObject jsonResponse = recibirFacturaUseCase.execute(jsonObject);
+        
+        System.out.println(jsonResponse);
+    }
+}
+```
+
+From `AsyncRecibeResourceTest.java:16-129`
+
+### SOAP Client Tests
+
+Test SOAP client connectivity:
+
+```java
+@QuarkusTest
+public class RucClientTest {
+    
+    @Inject
+    RucClient rucClient;
+    
+    @Test
+    public void testConsultaRUC() {
+        String ruc = "3437941";
+        HttpResponse<String> httpResponse = rucClient.consultaRUC(ruc);
+        
+        System.out.println("Código de estado: " + httpResponse.statusCode());
+        System.out.println("Cuerpo de la respuesta:");
+        System.out.println(httpResponse.body());
+    }
+}
+```
+
+From `RucClientTest.java:11-27`
+
+## Mocking SIFEN Services
+
+<Warning>
+Integration tests make real calls to SIFEN services. Ensure you have valid credentials configured in `sifen.properties` before running tests.
+</Warning>
+
+For unit tests that should not call external services, you can mock the SIFEN clients:
+
+```java
+// Example of mocking a SIFEN client
+@InjectMock
+RucClient rucClient;
+
+@Test
+void testWithMock() {
+    // Setup mock behavior
+    when(rucClient.consultaRUC(anyString()))
+        .thenReturn(mockHttpResponse);
+    
+    // Test your code
+    JsonObject response = consultarRucUseCase.execute("123456");
+    
+    // Verify
+    verify(rucClient).consultaRUC("123456");
+}
+```
+
+## Test Structure
+
+The test directory mirrors the source structure:
+
+```
+src/test/java/com/jsifen/
+├── presentacion/rest/          # REST endpoint tests
+│   ├── ConsultaRucResourceTest.java
+│   ├── ConsultaLoteResourceTest.java
+│   ├── ConsultaDEResourceTest.java
+│   └── AsyncRecibeResourceTest.java
+├── infrastructure/
+│   ├── adapter/                # Repository implementation tests
+│   ├── config/                 # Configuration tests
+│   ├── soap/                   # SOAP client tests
+│   ├── time/                   # NTP client tests
+│   └── util/                   # Utility tests
+```
+
+## Testing Best Practices
+
+1. **Use @QuarkusTest** - Ensures proper dependency injection and configuration
+2. **Test all error cases** - Include tests for invalid input, null values, and error responses
+3. **Print responses** - Use `System.out.println()` for debugging during development
+4. **Assert non-null** - Always verify responses are not null
+5. **Test JSON structure** - Verify expected fields exist in responses
+6. **Test integration** - Include end-to-end tests that call real SIFEN services
+7. **Mock external services** - For unit tests, mock SOAP clients to avoid external dependencies
+
+## Running Specific Tests
+
+Run a specific test class:
+
+```bash
+./gradlew test --tests ConsultaRucResourceTest
+```
+
+Run a specific test method:
+
+```bash
+./gradlew test --tests ConsultaRucResourceTest.testRucExistente
+```
+
+## Continuous Testing
+
+Run tests in continuous mode during development:
+
+```bash
+./gradlew test --continuous
+```
+
+Or use Quarkus dev mode which includes automatic test execution:
+
+```bash
+./gradlew quarkusDev
+```
+
+## Test Reports
+
+Test reports are generated in:
+
+```
+build/reports/tests/test/index.html
+```
+
+Open this file in a browser to view detailed test results.
+
+## Debugging Tests
+
+1. Add `-Dquarkus.log.level=DEBUG` for verbose logging
+2. Use IntelliJ IDEA or VSCode debug mode
+3. Add breakpoints in test methods
+4. Check test output in console for detailed errors
+5. Review SOAP request/response XML in logs

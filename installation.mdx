@@ -1,0 +1,293 @@
+---
+title: 'Installation'
+description: 'Complete installation guide for JSIFEN'
+---
+
+This guide covers the complete installation process for JSIFEN, including system requirements, dependencies, and configuration.
+
+## System Requirements
+
+JSIFEN requires the following to run:
+
+<CardGroup cols={2}>
+  <Card title="Java" icon="coffee">
+    **Version**: Java 17 or higher
+    
+    **Recommended**: Java 21 LTS
+  </Card>
+  <Card title="Operating System" icon="desktop">
+    Linux, macOS, or Windows
+    
+    All major platforms supported
+  </Card>
+  <Card title="Certificate" icon="certificate">
+    PKCS12 (`.p12`) certificate
+    
+    Required for SIFEN authentication
+  </Card>
+  <Card title="Network Port" icon="network-wired">
+    Port 8000 (default)
+    
+    Configurable in settings
+  </Card>
+</CardGroup>
+
+## Installation Steps
+
+<Steps>
+
+### Install Java
+
+Ensure you have Java 17 or higher installed. Verify your installation:
+
+```bash
+java -version
+```
+
+You should see output indicating Java 17 or higher:
+
+```
+openjdk version "21.0.1" 2023-10-17 LTS
+```
+
+<Tip>
+  We recommend using [SDKMAN!](https://sdkman.io/) on Linux/macOS or [Adoptium](https://adoptium.net/) on Windows to manage Java installations.
+</Tip>
+
+### Clone the repository
+
+Clone JSIFEN from your Git repository:
+
+```bash
+git clone https://github.com/your-org/jsifen.git
+cd jsifen
+```
+
+### Configure application properties
+
+JSIFEN uses two main configuration files located in `src/main/resources/`:
+
+#### application.properties
+
+Configure the HTTP port and API documentation path:
+
+```properties
+# HTTP server port
+quarkus.http.port=8000
+
+# Swagger UI documentation path
+quarkus.swagger-ui.path=/doc/swagger
+```
+
+#### sifen.properties
+
+Configure your SIFEN credentials and certificate:
+
+```properties
+# SIFEN Environment (prod/test)
+sifen.ambiente=prod
+sifen.id-csc=0001
+sifen.csc=your-csc-code-here
+sifen.keystore.path=/path/to/certificate.p12
+sifen.keystore.password=your-certificate-password
+```
+
+<Warning>
+  **Never commit credentials to version control**. Consider using environment variables or secure vaults for production deployments.
+</Warning>
+
+### Build the application
+
+Build JSIFEN using Gradle:
+
+<CodeGroup>
+
+```bash Linux/macOS
+./gradlew build
+```
+
+```bash Windows
+gradlew.bat build
+```
+
+</CodeGroup>
+
+The build process will:
+- Compile all Java source files
+- Run tests
+- Create a runnable JAR in `build/quarkus-app/`
+- Copy configuration files to `build/quarkus-app/config/`
+
+<Note>
+  The build process is configured to automatically copy `application.properties` and `sifen.properties` to the output directory's `config/` folder.
+</Note>
+
+### Verify the installation
+
+Run the application to verify everything is set up correctly:
+
+<CodeGroup>
+
+```bash Development Mode
+./gradlew quarkusDev
+```
+
+```bash Production Mode
+cd build/quarkus-app
+java -Dquarkus.config.locations=./config -jar quarkus-run.jar
+```
+
+</CodeGroup>
+
+</Steps>
+
+## Build Output Structure
+
+After building, your application structure will be:
+
+```
+build/quarkus-app/
+├── quarkus-run.jar          # Main executable
+├── config/
+│   ├── application.properties
+│   └── sifen.properties
+├── lib/                      # Dependencies
+└── quarkus/                  # Quarkus runtime files
+```
+
+## Configuration Details
+
+### Port Configuration
+
+The default port is `8000`. To change it, edit `src/main/resources/application.properties`:
+
+```properties
+quarkus.http.port=8080
+```
+
+Or override at runtime:
+
+```bash
+java -Dquarkus.http.port=8080 -jar quarkus-run.jar
+```
+
+### Multi-Tenant Configuration
+
+JSIFEN supports multiple SIFEN clients (emisores). Add additional configurations in `sifen.properties`:
+
+```properties
+# Default client
+sifen.ambiente=prod
+sifen.id-csc=0001
+sifen.csc=default-csc-code
+sifen.keystore.path=/path/to/default-cert.p12
+sifen.keystore.password=default-password
+
+# Additional client (e.g., "sanantonio")
+sifen.sanantonio.ambiente=prod
+sifen.sanantonio.id-csc=0002
+sifen.sanantonio.csc=sanantonio-csc-code
+sifen.sanantonio.keystore.path=/path/to/sanantonio-cert.p12
+sifen.sanantonio.keystore.password=sanantonio-password
+```
+
+Then specify the client using the `Emisor` header in API requests:
+
+```bash
+curl -X POST http://localhost:8000/consulta/ruc \
+  -H "Content-Type: application/json" \
+  -H "Emisor: sanantonio" \
+  -d '{"ruc": "80012345-6"}'
+```
+
+## Testing the Installation
+
+Run the test suite to ensure everything is working:
+
+```bash
+./gradlew test
+```
+
+Test the health endpoint:
+
+```bash
+curl http://localhost:8000/health/sifen/test
+```
+
+Expected response:
+
+```json
+{
+  "status": "UP",
+  "timestamp": "2026-03-08T10:30:00Z"
+}
+```
+
+## Dependencies
+
+JSIFEN is built on the following key technologies:
+
+- **Quarkus 3.26.2**: Kubernetes-native Java framework
+- **Java 21**: Target compilation version
+- **Jakarta EE**: REST, JSON-B APIs
+- **SmallRye OpenAPI**: API documentation generation
+
+All dependencies are managed automatically by Gradle.
+
+## Troubleshooting
+
+### Build Failures
+
+**Issue**: Gradle build fails with compilation errors
+
+**Solution**: Ensure you're using Java 17 or higher:
+
+```bash
+java -version
+```
+
+### Certificate Errors
+
+**Issue**: Certificate not found or invalid password
+
+**Solution**: 
+- Verify the certificate path is absolute, not relative
+- Check the certificate password is correct
+- Ensure the certificate file has proper read permissions
+
+### Port Conflicts
+
+**Issue**: Port 8000 is already in use
+
+**Solution**: Change the port in `application.properties` or use a runtime override:
+
+```bash
+java -Dquarkus.http.port=8080 -jar quarkus-run.jar
+```
+
+### SIFEN Connection Issues
+
+**Issue**: Cannot connect to SIFEN services
+
+**Solution**:
+- Verify your credentials are correct
+- Check network connectivity to SIFEN servers
+- Ensure you're using the correct environment (`test` or `prod`)
+- Verify your certificate is valid and not expired
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Make your first API call in under 10 minutes
+  </Card>
+  <Card title="Configuration" icon="gear" href="/configuration/sifen-setup">
+    Learn about advanced configuration options
+  </Card>
+  <Card title="API Reference" icon="book" href="/api/invoices/generate-xml">
+    Explore all available endpoints
+  </Card>
+  <Card title="Deployment" icon="server" href="/guides/deployment">
+    Deploy JSIFEN to production
+  </Card>
+</CardGroup>

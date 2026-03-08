@@ -1,0 +1,319 @@
+---
+title: "Receive Invoice (Async)"
+api: "POST /factura/async/recibe"
+description: "Process an electronic invoice asynchronously and submit it to SIFEN"
+---
+
+This endpoint receives an invoice in JSON format, generates the signed XML, and submits it to SIFEN (Sistema de Facturación Electrónica Nacional) for processing. The operation is performed asynchronously.
+
+## Authentication
+
+<ParamField header="token" type="string" required>
+  Authentication token for API access
+</ParamField>
+
+<ParamField header="Emisor" type="string">
+  Multi-tenant identifier for the issuing entity. Optional - if not provided or blank, the default emisor will be used.
+</ParamField>
+
+## Request Body
+
+The request body must contain a complete electronic invoice following the SIFEN structure.
+
+<ParamField body="iTipEmi" type="integer" required>
+  Emission type (1 = Normal)
+</ParamField>
+
+<ParamField body="dCodSeg" type="string" required>
+  Security code for the document
+</ParamField>
+
+<ParamField body="iTiDE" type="integer" required>
+  Electronic document type (1 = Electronic invoice)
+</ParamField>
+
+<ParamField body="dNumTim" type="integer" required>
+  Timbrado number assigned by SET
+</ParamField>
+
+<ParamField body="dEst" type="string" required>
+  Establishment code (3 digits)
+</ParamField>
+
+<ParamField body="dPunExp" type="string" required>
+  Point of sale code (3 digits)
+</ParamField>
+
+<ParamField body="dNumDoc" type="string" required>
+  Document number
+</ParamField>
+
+<ParamField body="dFeEmiDE" type="string" required>
+  Emission date and time (ISO 8601: YYYY-MM-DDTHH:mm:ss)
+</ParamField>
+
+<ParamField body="iTipTra" type="integer" required>
+  Transaction type (2 = Service provision)
+</ParamField>
+
+<ParamField body="iTImp" type="integer" required>
+  Tax impact (1 = IVA)
+</ParamField>
+
+<ParamField body="cMoneOpe" type="string" required>
+  Operation currency code (e.g., "PYG")
+</ParamField>
+
+<ParamField body="dRucEm" type="integer" required>
+  Issuer RUC (tax ID number)
+</ParamField>
+
+<ParamField body="dDVEmi" type="integer" required>
+  Issuer verification digit
+</ParamField>
+
+<ParamField body="iTipCont" type="integer" required>
+  Taxpayer type (2 = Legal entity)
+</ParamField>
+
+<ParamField body="dNomEmi" type="string" required>
+  Issuer legal name
+</ParamField>
+
+<ParamField body="dDirEmi" type="string" required>
+  Issuer address
+</ParamField>
+
+<ParamField body="dTelEmi" type="string" required>
+  Issuer phone number
+</ParamField>
+
+<ParamField body="dEmailE" type="string" required>
+  Issuer email address
+</ParamField>
+
+<ParamField body="cActEco" type="integer" required>
+  Economic activity code
+</ParamField>
+
+<ParamField body="iNatRec" type="integer" required>
+  Receiver nature (2 = Legal entity)
+</ParamField>
+
+<ParamField body="iTiOpe" type="integer" required>
+  Operation type (1 = B2B)
+</ParamField>
+
+<ParamField body="iTipIDRec" type="string" required>
+  Receiver ID type ("1" = Paraguayan ID)
+</ParamField>
+
+<ParamField body="dNumIDRec" type="string" required>
+  Receiver identification number
+</ParamField>
+
+<ParamField body="dNomRec" type="string" required>
+  Receiver name
+</ParamField>
+
+<ParamField body="iIndPres" type="integer" required>
+  Presence indicator (1 = In-person operation)
+</ParamField>
+
+<ParamField body="iCondOpe" type="integer" required>
+  Operation condition (1 = Cash, 2 = Credit)
+</ParamField>
+
+<ParamField body="iTiPago" type="integer" required>
+  Payment type (2 = Bank transfer)
+</ParamField>
+
+<ParamField body="dTotGralOpe" type="string" required>
+  Total operation amount
+</ParamField>
+
+<ParamField body="dTotIVA" type="number" required>
+  Total IVA amount
+</ParamField>
+
+<ParamField body="Detalles" type="array" required>
+  Array of invoice line items with product/service details, quantities, prices, and tax information
+</ParamField>
+
+## Response
+
+The response contains the result from SIFEN after processing the invoice.
+
+<ResponseField name="status" type="string">
+  Processing status from SIFEN
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Response message from SIFEN
+</ResponseField>
+
+<ResponseField name="cdc" type="string">
+  CDC (Código de Control) assigned to the document if successful
+</ResponseField>
+
+<Note>
+  The exact response structure depends on SIFEN's response format. Successful submissions typically include a CDC, while errors include detailed error codes and messages.
+</Note>
+
+<RequestExample>
+```bash cURL
+curl -X POST https://api.example.com/factura/async/recibe \
+  -H "Content-Type: application/json" \
+  -H "token: your-api-token" \
+  -H "Emisor: your-emisor-id" \
+  -d '{
+  "iTipEmi": 1,
+  "dDesTipEmi": "Normal",
+  "dCodSeg": "572819034",
+  "iTiDE": 1,
+  "dDesTiDE": "Factura electrónica",
+  "dNumTim": 77441122,
+  "dEst": "003",
+  "dPunExp": "004",
+  "dNumDoc": "0000789",
+  "dFeIniT": "2024-07-15",
+  "dFeEmiDE": "2025-09-27T16:45:10",
+  "iTipTra": 2,
+  "dDesTipTra": "Prestación de servicios",
+  "iTImp": 1,
+  "dDesTImp": "IVA",
+  "cMoneOpe": "PYG",
+  "dDesMoneOpe": "Guarani",
+  "dRucEm": 4839205,
+  "dDVEmi": 4,
+  "iTipCont": 2,
+  "dNomEmi": "SERVITEC S.R.L.",
+  "dNomFanEmi": "SERVITEC EXPRESS",
+  "dDirEmi": "AV. CENTRAL KM 5",
+  "dNumCas": 150,
+  "cDepEmi": 11,
+  "dDesDepEmi": "CENTRAL",
+  "cDisEmi": 102,
+  "dDesDisEmi": "LUQUE",
+  "cCiuEmi": 5500,
+  "dDesCiuEmi": "ZONA NORTE",
+  "dTelEmi": "0982123456",
+  "dEmailE": "info@servitec.com.py",
+  "cActEco": 70200,
+  "dDesActEco": "SERVICIOS DE REPARACIÓN Y MANTENIMIENTO",
+  "iNatRec": 2,
+  "iTiOpe": 1,
+  "cPaisRec": "PRY",
+  "dDesPaisRe": "Paraguay",
+  "iTipIDRec": "1",
+  "dDTipIDRec": "Cédula paraguaya",
+  "dNumIDRec": "45678901",
+  "dNomRec": "COMERCIAL EL PUENTE S.A.",
+  "iIndPres": 1,
+  "dDesIndPres": "Operación presencial",
+  "iCondOpe": 2,
+  "dDCondOpe": "Crédito",
+  "iTiPago": 2,
+  "dDesTiPag": "Transferencia bancaria",
+  "dMonTiPag": "250000.0",
+  "cMoneTiPag": "PYG",
+  "dDMoneTiPag": "Guarani",
+  "dSubExe": "0.0",
+  "dSubExo": "0.0",
+  "dSub5": "0.0",
+  "dSub10": "250000.0",
+  "dTotOpe": "250000.0",
+  "dTotDesc": 0,
+  "dTotDescGlotem": 0,
+  "dTotAntItem": 0,
+  "dTotAnt": 0,
+  "dPorcDescTotal": 0,
+  "dDescTotal": 0,
+  "dAnticipo": 0,
+  "dRedon": 0,
+  "dTotGralOpe": "250000.0",
+  "dIVA5": 0,
+  "dIVA10": 22727,
+  "dLiqTotIVA5": 0,
+  "dLiqTotIVA10": 0,
+  "dTotIVA": 22727,
+  "dBaseGrav5": 0,
+  "dBaseGrav10": 227273,
+  "dTBasGraIVA": 227273,
+  "Detalles": [
+    {
+      "dCodInt": "A-991",
+      "dDesProSer": "SERVICIO DE CONSULTORÍA TÉCNICA",
+      "cUniMed": "77",
+      "dDesUniMed": "UNI",
+      "dCantProSer": "1.0",
+      "dPUniProSer": "250000.0",
+      "dTotBruOpeItem": "250000.0",
+      "dTotOpeItem": "250000.0",
+      "iAfecIVA": "1",
+      "dDesAfecIVA": "Gravado IVA",
+      "dPropIVA": "100",
+      "dTasaIVA": "10",
+      "dBasGravIVA": "227273",
+      "dLiqIVAItem": "22727",
+      "dBasExe": "0"
+    }
+  ]
+}'
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 OK
+{
+  "status": "approved",
+  "message": "Documento electrónico procesado exitosamente",
+  "cdc": "01800695631001003000124566202509271645108857294613"
+}
+```
+
+```json 500 Internal Server Error
+"Error interno: Connection timeout to SIFEN service"
+```
+</ResponseExample>
+
+## Processing Flow
+
+The endpoint performs the following operations asynchronously:
+
+1. **Validation**: Validates the emisor context and invoice JSON structure
+2. **XML Generation**: Converts JSON invoice to SIFEN-compliant XML format
+3. **Digital Signature**: Applies digital signature to the XML document
+4. **QR Code Addition**: Adds QR code node for mobile verification
+5. **Submission**: Sends the signed XML to SIFEN for official processing
+
+<Note>
+  This is an asynchronous operation. The endpoint returns the response from SIFEN, which may include approval, rejection, or validation errors. The invoice is only legally valid after SIFEN approval.
+</Note>
+
+## Async Processing
+
+The invoice is processed in the following stages:
+
+- **XML Generation**: The JSON is converted to SIFEN XML format
+- **Signing**: Digital signature is applied using the configured certificate
+- **QR Code**: A verification QR code is embedded in the XML
+- **Transmission**: The complete XML is transmitted to SIFEN
+- **Response**: SIFEN's response is returned to the caller
+
+<Note>
+  Processing time depends on SIFEN's availability and response time. Typical processing takes 2-5 seconds but may be longer during peak hours.
+</Note>
+
+## Error Responses
+
+The endpoint returns a 500 Internal Server Error status code when:
+
+- The JSON structure is invalid or incomplete
+- Required fields are missing
+- The emisor configuration is invalid
+- XML generation or signing fails
+- SIFEN service is unavailable
+- SIFEN rejects the invoice due to validation errors
+
+Error messages are returned as plain text describing the specific error encountered.

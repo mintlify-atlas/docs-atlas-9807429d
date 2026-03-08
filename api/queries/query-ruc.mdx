@@ -1,0 +1,149 @@
+---
+title: 'Query RUC'
+api: 'POST /consulta/ruc'
+description: 'Query taxpayer information by RUC (Registro Único de Contribuyente)'
+---
+
+## Overview
+
+Query taxpayer information from SIFEN using a RUC number. This endpoint returns details about the taxpayer's registration status, electronic invoice capabilities, and business information.
+
+## Authentication
+
+<ParamField header="token" type="string" required>
+  Authentication token for API access
+</ParamField>
+
+<ParamField header="Emisor" type="string">
+  Emisor identifier. If not provided, the default emisor will be used
+</ParamField>
+
+## Request
+
+### Request Body
+
+<ParamField body="ruc" type="string" required>
+  The RUC number to query. Must be a valid Paraguayan RUC format (e.g., "80012345-7")
+</ParamField>
+
+### Example Request
+
+```bash
+curl -X POST https://api.jsifen.com/consulta/ruc \
+  -H "Content-Type: application/json" \
+  -H "token: your-api-token" \
+  -H "Emisor: 80012345-7" \
+  -d '{
+    "ruc": "80012345-7"
+  }'
+```
+
+## Response
+
+### Response Fields
+
+<ResponseField name="codigoRespuesta" type="string">
+  Response code from SIFEN indicating the query result
+</ResponseField>
+
+<ResponseField name="mensajeRespuesta" type="string">
+  Descriptive message about the query result
+</ResponseField>
+
+<ResponseField name="statusCode" type="integer">
+  HTTP status code of the response
+</ResponseField>
+
+<ResponseField name="error" type="string">
+  Error message if the query failed (null on success)
+</ResponseField>
+
+<ResponseField name="datosRUC" type="object">
+  Detailed taxpayer information (null if RUC not found)
+  
+  <ResponseField name="estado" type="string">
+    Current registration status (e.g., "ACTIVO", "INACTIVO")
+  </ResponseField>
+  
+  <ResponseField name="nombre" type="string">
+    Business or individual name registered with the RUC
+  </ResponseField>
+  
+  <ResponseField name="RUCdv" type="string">
+    Complete RUC with verification digit
+  </ResponseField>
+  
+  <ResponseField name="numeroRUC" type="integer">
+    RUC number without verification digit
+  </ResponseField>
+  
+  <ResponseField name="facturaElectronica" type="string">
+    Electronic invoice capability status (e.g., "SI", "NO")
+  </ResponseField>
+  
+  <ResponseField name="codigoEstado" type="string">
+    State code for the registration status
+  </ResponseField>
+</ResponseField>
+
+### Success Response (200 OK)
+
+```json
+{
+  "codigoRespuesta": "0",
+  "mensajeRespuesta": "Consulta exitosa",
+  "statusCode": 200,
+  "error": null,
+  "datosRUC": {
+    "estado": "ACTIVO",
+    "nombre": "EMPRESA EJEMPLO S.A.",
+    "RUCdv": "80012345-7",
+    "numeroRUC": 80012345,
+    "facturaElectronica": "SI",
+    "codigoEstado": "01"
+  }
+}
+```
+
+### RUC Not Found (200 OK)
+
+```json
+{
+  "codigoRespuesta": "404",
+  "mensajeRespuesta": "RUC no encontrado",
+  "statusCode": 200,
+  "error": null,
+  "datosRUC": null
+}
+```
+
+### Error Response (500)
+
+```json
+Error interno: [error message]
+```
+
+## RUC Format
+
+The RUC must follow the Paraguayan format:
+- Base number: 8 digits
+- Verification digit: 1 digit
+- Format: `XXXXXXXX-X` (e.g., `80012345-7`)
+
+## Use Cases
+
+- **Validate Customer RUC**: Verify that a customer's RUC is valid and active before issuing an electronic invoice
+- **Check Electronic Invoice Capability**: Determine if a recipient can receive electronic invoices
+- **Business Name Lookup**: Retrieve the official registered name for a RUC
+- **Registration Status Verification**: Confirm that a taxpayer is currently active
+- **Integration Validation**: Validate RUC data during customer onboarding or transaction processing
+
+## Error Handling
+
+The endpoint returns HTTP 500 with an error message if:
+- The RUC format is invalid
+- SIFEN service is unavailable
+- Authentication fails
+- Network or internal processing errors occur
+
+Note that a valid response (200 OK) with `datosRUC: null` indicates the RUC was not found in the registry, which is different from an error condition.
