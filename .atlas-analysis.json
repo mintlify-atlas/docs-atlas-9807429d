@@ -1,0 +1,101 @@
+{
+  "projectType": "api-service",
+  "projectName": "JSIFEN",
+  "projectDescription": "Java client library for Paraguay's SIFEN electronic invoicing system with REST API interface",
+  "theme": "linden",
+  "primaryColor": "#0038a8",
+  "lightColor": "#d52b1e",
+  "darkColor": "#002d7f",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/sifen-setup",
+              "configuration/certificates",
+              "configuration/multi-tenant"
+            ]
+          },
+          {
+            "group": "Architecture",
+            "pages": [
+              "architecture/clean-architecture",
+              "architecture/project-structure"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/error-handling",
+              "guides/testing",
+              "guides/deployment"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Invoices",
+            "pages": [
+              "api/invoices/generate-xml",
+              "api/invoices/receive-invoice"
+            ]
+          },
+          {
+            "group": "Queries",
+            "pages": [
+              "api/queries/query-de",
+              "api/queries/query-ruc",
+              "api/queries/query-batch"
+            ]
+          },
+          {
+            "group": "Events",
+            "pages": [
+              "api/events/cancel-event"
+            ]
+          },
+          {
+            "group": "Monitoring",
+            "pages": [
+              "api/monitoring/health-check"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Electronic invoice XML generation and digital signing",
+    "Document queries by CDC (Control Code)",
+    "RUC (tax ID) validation and lookup",
+    "Batch processing for multiple documents",
+    "Event cancellation support",
+    "Multi-tenant configuration",
+    "SIFEN health monitoring",
+    "Clean Architecture implementation"
+  ],
+  "publicApiSurface": [
+    "POST /factura/xml/generar - Generate signed XML invoice",
+    "POST /factura/async/recibe - Receive invoice asynchronously",
+    "POST /consulta/de/xml - Query electronic document (XML)",
+    "POST /consulta/de/json - Query electronic document (JSON)",
+    "POST /consulta/ruc - Query RUC information",
+    "POST /consulta/lote - Query batch",
+    "POST /evento/cancelar - Cancel event",
+    "GET /health/sifen/{env} - Check SIFEN health status"
+  ]
+}
